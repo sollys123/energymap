@@ -31,7 +31,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+            const { useState, useEffect, useRef, useMemo } = React;
 
         // --- 图标组件 ---
         const IconWrapper = ({ children, size = 24, className = "" }) => (
@@ -56,6 +56,7 @@
             
             // --- 核心状态 ---
             const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
+            const [energyView, setEnergyView] = useState('price'); // 'price' | 'policy-long' | 'policy-spot'
             const [viewMode, setViewMode] = useState('china'); // 'china' | 'province'
             const [currentProvince, setCurrentProvince] = useState(null);
             const [selectedProvinceInfo, setSelectedProvinceInfo] = useState(null);
@@ -274,6 +275,79 @@
 
             const energyData = buildEnergyData();
 
+            // --- 电能量政策进程数据 ---
+            const policyLevelLabel = {
+                1: '无政策',
+                2: '经营主体包含储能',
+                3: '交易细则包含储能'
+            };
+
+            const normalizeProvinceName = (name) => {
+                const map = {
+                    '河北南网': '河北省',
+                    '冀北': '河北省'
+                };
+                if (map[name]) return map[name];
+                if (/省$|市$|自治区$/.test(name)) return name;
+                if (['北京', '天津', '上海', '重庆'].includes(name)) return `${name}市`;
+                return `${name}省`;
+            };
+
+            const buildPolicyData = (rawList, policyTag) => {
+                const mapValues = {};
+                const details = {};
+                const aliasMap = {};
+
+                rawList.forEach(({ name, value }) => {
+                    const provinceName = normalizeProvinceName(name);
+                    mapValues[provinceName] = Math.max(mapValues[provinceName] || 0, value);
+                    aliasMap[provinceName] = aliasMap[provinceName] ? [...aliasMap[provinceName], name] : [name];
+                });
+
+                Object.entries(mapValues).forEach(([province, value]) => {
+                    const aliases = aliasMap[province] || [];
+                    const aliasText = aliases.length > 1 ? `覆盖区域：${aliases.join('、')}` : (aliases[0] || province);
+                    details[province] = {
+                        title: `${province}政策进程`,
+                        totalVolume: `等级 ${value}`,
+                        tags: [policyTag, policyLevelLabel[value] || '未知'],
+                        heatValue: value,
+                        details: [
+                            { label: '政策类型', value: policyTag },
+                            { label: '当前状态', value: policyLevelLabel[value] || '未知' },
+                            { label: '备注', value: aliasText }
+                        ]
+                    };
+                });
+
+                return { mapValues, details, aliasMap, policyTag };
+            };
+
+            const rawPolicyLong = [
+                { name: '北京', value: 2 }, { name: '天津', value: 2 }, { name: '河北南网', value: 2 }, { name: '冀北', value: 2 },
+                { name: '山东', value: 1 }, { name: '山西', value: 2 }, { name: '安徽', value: 2 }, { name: '福建', value: 2 },
+                { name: '上海', value: 2 }, { name: '江苏', value: 2 }, { name: '浙江', value: 2 }, { name: '湖北', value: 2 },
+                { name: '湖南', value: 2 }, { name: '河南', value: 2 }, { name: '江西', value: 1 }, { name: '吉林', value: 2 },
+                { name: '黑龙江', value: 2 }, { name: '辽宁', value: 2 }, { name: '甘肃', value: 1 }, { name: '宁夏', value: 2 },
+                { name: '青海', value: 2 }, { name: '陕西', value: 2 }, { name: '新疆', value: 2 }, { name: '四川', value: 2 },
+                { name: '重庆', value: 1 }, { name: '广东', value: 2 }, { name: '广西', value: 1 }, { name: '贵州', value: 2 },
+                { name: '云南', value: 2 }, { name: '海南', value: 2 }
+            ];
+
+            const rawPolicySpot = [
+                { name: '北京', value: 3 }, { name: '天津', value: 3 }, { name: '河北南网', value: 3 }, { name: '冀北', value: 3 },
+                { name: '山东', value: 3 }, { name: '山西', value: 3 }, { name: '安徽', value: 3 }, { name: '福建', value: 3 },
+                { name: '上海', value: 3 }, { name: '江苏', value: 3 }, { name: '浙江', value: 3 }, { name: '湖北', value: 3 },
+                { name: '湖南', value: 3 }, { name: '河南', value: 3 }, { name: '江西', value: 3 }, { name: '吉林', value: 3 },
+                { name: '黑龙江', value: 3 }, { name: '辽宁', value: 3 }, { name: '甘肃', value: 3 }, { name: '宁夏', value: 3 },
+                { name: '青海', value: 3 }, { name: '陕西', value: 3 }, { name: '新疆', value: 3 }, { name: '四川', value: 3 },
+                { name: '重庆', value: 3 }, { name: '广东', value: 3 }, { name: '广西', value: 3 }, { name: '贵州', value: 3 },
+                { name: '云南', value: 3 }, { name: '海南', value: 3 }
+            ];
+
+            const policyLongData = buildPolicyData(rawPolicyLong, '中长期政策');
+            const policySpotData = buildPolicyData(rawPolicySpot, '现货政策');
+
             // --- 辅助数据 ---
             const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省'];
             const blueProvinces = ['贵州省', '云南省', '广西壮族自治区', '湖南省', '湖北省', '江西省', '内蒙古自治区'];
@@ -286,6 +360,8 @@
                 market: ['#f0f9ff', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9']
             };
 
+            const policyColorScale = ['#eef2ff', '#c7d2fe', '#9aa5ff'];
+
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
                 const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
@@ -295,8 +371,19 @@
                 return palette[idx];
             };
 
+            const getPolicyColor = (value) => {
+                const ratio = Math.min(1, Math.max(0, (value - 1) / 2));
+                const idx = Math.min(policyColorScale.length - 1, Math.round(ratio * (policyColorScale.length - 1)));
+                return policyColorScale[idx];
+            };
+
             // --- 数据选择逻辑 ---
-            const currentData = marketType === 'frequency' ? frequencyData : energyData;
+            const currentData = useMemo(() => {
+                if (marketType === 'frequency') return frequencyData;
+                if (energyView === 'policy-long') return policyLongData;
+                if (energyView === 'policy-spot') return policySpotData;
+                return energyData;
+            }, [marketType, energyView]);
 
             // --- 数据转换函数 ---
             const convertPointData = (data) => {
@@ -336,15 +423,26 @@
 
                 Object.keys(values).forEach(name => {
                     if (marketType === 'energy') {
-                        const category = energyData.categoryMap[name];
-                        const color = getEnergyColor(values[name], category);
-                        data.push({
-                            name,
-                            value: values[name],
-                            itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
-                            emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
-                            energyCategory: category
-                        });
+                        if (energyView === 'policy-long' || energyView === 'policy-spot') {
+                            const color = getPolicyColor(values[name]);
+                            data.push({
+                                name,
+                                value: values[name],
+                                itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
+                                emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
+                                policyType: energyView
+                            });
+                        } else {
+                            const category = energyData.categoryMap[name];
+                            const color = getEnergyColor(values[name], category);
+                            data.push({
+                                name,
+                                value: values[name],
+                                itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
+                                emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
+                                energyCategory: category
+                            });
+                        }
                     } else {
                         data.push({ name: name, value: values[name] });
                     }
@@ -411,6 +509,17 @@
                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                 borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                 formatter: (params) => {
+                                    if (params.data?.policyType) {
+                                        const levelLabel = policyLevelLabel[params.value] || '未知';
+                                        const aliases = (policyLongData.aliasMap[params.name] || policySpotData.aliasMap[params.name] || []);
+                                        const aliasLine = aliases.length ? `<div style="font-size:12px;color:#475569;margin-top:4px;">覆盖：${aliases.join('、')}</div>` : '';
+                                        const tag = params.data.policyType === 'policy-long' ? '中长期政策' : '现货政策';
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">类型：<span style="font-weight:bold; color:${currentPalette.map[1]};">${tag}</span></div>`
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:600;">${levelLabel}</div>`
+                                            + aliasLine
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                    }
                                     if (params.data?.energyCategory) {
                                         const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
                                         const display = energyData.displayMap[params.name] || params.value;
@@ -546,14 +655,25 @@
             // 监听变化
             useEffect(() => {
                 loadMap(viewMode, currentProvince);
-            }, [viewMode, currentProvince, marketType]); // 增加 marketType 依赖
+            }, [viewMode, currentProvince, marketType, energyView]); // 增加 marketType 依赖
 
             // 切换市场时重置视图
             useEffect(() => {
                 setViewMode('china');
                 setCurrentProvince(null);
                 setSelectedProvinceInfo(null);
+                if (marketType !== 'energy') {
+                    setEnergyView('price');
+                }
             }, [marketType]);
+
+            useEffect(() => {
+                if (marketType === 'energy') {
+                    setViewMode('china');
+                    setCurrentProvince(null);
+                    setSelectedProvinceInfo(null);
+                }
+            }, [energyView, marketType]);
 
             useEffect(() => {
                 const handleResize = () => chartInstanceRef.current && chartInstanceRef.current.resize();
@@ -611,7 +731,7 @@
                                     
                                     {/* 0. 市场类型切换器 (核心功能) */}
                                     <div className="p-1 bg-slate-100 rounded-lg flex gap-1">
-                                        <button 
+                                        <button
                                             onClick={() => setMarketType('frequency')}
                                             className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
@@ -625,10 +745,32 @@
                                         </button>
                                     </div>
 
+                                    {marketType === 'energy' && (
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">电能量视图</div>
+                                            <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
+                                                <button
+                                                    onClick={() => setEnergyView('price')}
+                                                    className={`px-2 py-2 rounded-lg border transition-all ${energyView === 'price' ? 'bg-white text-amber-700 border-amber-200 shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-100 hover:text-slate-700'}`}
+                                                >价差热力图</button>
+                                                <button
+                                                    onClick={() => setEnergyView('policy-long')}
+                                                    className={`px-2 py-2 rounded-lg border transition-all ${energyView === 'policy-long' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-100 hover:text-slate-700'}`}
+                                                >中长期政策</button>
+                                                <button
+                                                    onClick={() => setEnergyView('policy-spot')}
+                                                    className={`px-2 py-2 rounded-lg border transition-all ${energyView === 'policy-spot' ? 'bg-white text-blue-700 border-blue-200 shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-100 hover:text-slate-700'}`}
+                                                >现货政策</button>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500">切换价差热力与政策进程热力图，默认保持全国视角。</div>
+                                        </div>
+                                    )}
+
                                     {/* 1. 收益/热度图例 */}
                                     {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : '电能量政策热力图')}
                                                 {marketType === 'frequency' ? '调频收益 (热度)' : '电能量价差热力图'}
                                             </div>
                                             {marketType === 'frequency' ? (
@@ -642,6 +784,7 @@
                                                         <span>低</span>
                                                     </div>
                                                 </div>
+                                            ) : energyView === 'price' ? (
                                             ) : (
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-3">
@@ -669,6 +812,21 @@
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
                                                         实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。
                                                         市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner" style={{ background: `linear-gradient(to bottom, ${policyColorScale[2]}, ${policyColorScale[1]}, ${policyColorScale[0]})` }}></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>交易细则包含储能</span>
+                                                            <span>经营主体包含储能</span>
+                                                            <span>无政策</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                                                        无政策 = 最浅色；经营主体包含储能 = 中间色；交易细则包含储能 = 最深色。
+                                                        切换中长期 / 现货查看不同政策进程热力图。
                                                     </div>
                                                 </div>
                                             )}
