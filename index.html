@@ -82,17 +82,17 @@
             const colorPalettes = {
                 frequency: {
                     // 红/橙/黄暖色系 (代表热度/收益)
-                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'], 
+                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'],
                     highlight: '#d97706',
                     iconBg: 'bg-red-50', iconText: 'text-red-600', iconBorder: 'border-red-100',
                     gradientFrom: 'from-red-600', gradientTo: 'to-orange-500'
                 },
                 energy: {
-                    // 蓝/紫冷色系 (代表电量/负荷)
-                    map: ['#1e1b4b', '#312e81', '#4338ca', '#6366f1', '#a5b4fc'], 
-                    highlight: '#4f46e5',
-                    iconBg: 'bg-indigo-50', iconText: 'text-indigo-600', iconBorder: 'border-indigo-100',
-                    gradientFrom: 'from-indigo-600', gradientTo: 'to-blue-500'
+                    // 蓝色系 (代表电量/负荷)
+                    map: ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'],
+                    highlight: '#38bdf8',
+                    iconBg: 'bg-sky-50', iconText: 'text-sky-600', iconBorder: 'border-sky-100',
+                    gradientFrom: 'from-sky-500', gradientTo: 'to-cyan-400'
                 }
             };
 
@@ -243,7 +243,7 @@
                     details[name] = {
                         title: `${name} 电能量价差`,
                         totalVolume: info.display,
-                        marketVolumeDisplay: info.note || '暂无备注',
+                        marketVolumeDisplay: info.note ? `${info.display} ｜ ${info.note}` : info.display,
                         tags: [info.category === 'actual' ? '实测数据' : '市场区间', info.range ? '提供范围' : '单点数据'],
                         details: [
                             { label: '价格/价差', value: info.display },
@@ -279,16 +279,18 @@
             const blueProvinces = ['贵州省', '云南省', '广西壮族自治区', '湖南省', '湖北省', '江西省', '内蒙古自治区'];
             const lightBlueProvinces = ['新疆维吾尔自治区', '黑龙江省', '吉林省', '辽宁省', '青海省'];
 
+            const actualDataProvinces = ['河北省', '山西省', '江苏省', '浙江省', '河南省', '甘肃省', '宁夏回族自治区', '陕西省', '广东省'];
+
             const energyColorScale = {
-                actual: ['#0f172a', '#1d4ed8', '#2563eb', '#60a5fa', '#93c5fd'],
-                market: ['#4c1d95', '#7c3aed', '#a855f7', '#c084fc', '#e9d5ff']
+                actual: ['#fffbeb', '#fef3c7', '#fde68a', '#fbbf24', '#f59e0b'],
+                market: ['#f0f9ff', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9']
             };
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
                 const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
                 const safeSpan = max - min || 1;
-                const ratio = Math.min(1, Math.max(0, (value - min) / safeSpan));
+                const ratio = Math.min(1, Math.max(0, safeSpan === 0 ? 0.5 : (value - min) / safeSpan));
                 const idx = Math.min(palette.length - 1, Math.floor(ratio * (palette.length - 1)));
                 return palette[idx];
             };
@@ -409,7 +411,21 @@
                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                 borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                 formatter: (params) => {
-                                    if (params.seriesType === 'map') {
+                                    if (params.data?.energyCategory) {
+                                        const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
+                                        const display = energyData.displayMap[params.name] || params.value;
+                                        const note = energyData.noteMap[params.name];
+                                        const range = energyData.rangeMap[params.name];
+                                        const rangeLine = range ? `<div style="font-size:12px;color:#475569;margin-top:4px;">范围数值：${range[0]} ~ ${range[1]} 元/kWh</div>` : '';
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">类别：<span style="font-weight:bold; color:${currentPalette.map[1]};">${categoryLabel}</span></div>`
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:600;">${display}</div>`
+                                            + (note ? `<div style="font-size:12px; color:#64748b; margin-top:4px;">${note}</div>` : '')
+                                            + rangeLine
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                    }
+
+                                    if (marketType === 'frequency') {
                                         if (!params.value) return `<div style="color:#94a3b8">${params.name} <br/>暂无数据</div>`;
                                         let colorDot = `<span style="display:inline-block;margin-right:6px;border-radius:50%;width:8px;height:8px;background-color:${Array.isArray(params.color) ? params.color[params.color.length-1] : params.color};"></span>`;
                                         if (params.value > 0) {
@@ -427,13 +443,19 @@
                                 }
                             },
                             ...(marketType === 'frequency' ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } } : {}),
-                            geo: {
-                                map: 'china', roam: true, zoom: 1.2, center: [104.114129, 37.550339],
+                            series: [{
+                                name: '市场分布',
+                                type: 'map',
+                                map: 'china',
+                                roam: true,
+                                zoom: 1.2,
+                                center: [104.114129, 37.550339],
                                 label: { show: true, fontSize: 10, color: 'rgba(0,0,0,0.5)' },
                                 itemStyle: { areaColor: '#f8fafc', borderColor: '#cbd5e1', borderWidth: 1 },
-                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } }
-                            },
-                            series: [{ name: '市场分布', type: 'map', geoIndex: 0, data: generateMapData(), selectedMode: false }]
+                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } },
+                                data: generateMapData(),
+                                selectedMode: false
+                            }]
                         };
                     } else {
                         // === 省份视图 ===
@@ -607,18 +629,49 @@
                                     {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量规模 (热度)'}
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量价差热力图'}
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`h-32 w-2 rounded-full shadow-inner bg-gradient-to-b ${marketType === 'frequency' ? 'from-[#991b1b] via-[#ea580c] to-[#fef08a]' : 'from-[#1e1b4b] via-[#4338ca] to-[#a5b4fc]'}`}></div>
-                                                <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
-                                                    <span>高</span>
-                                                    <span>中高</span>
-                                                    <span>中</span>
-                                                    <span>中低</span>
-                                                    <span>低</span>
+                                            {marketType === 'frequency' ? (
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-32 w-2 rounded-full shadow-inner bg-gradient-to-b from-[#991b1b] via-[#ea580c] to-[#fef08a]"></div>
+                                                    <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
+                                                        <span>高</span>
+                                                        <span>中高</span>
+                                                        <span>中</span>
+                                                        <span>中低</span>
+                                                        <span>低</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#fef3c7] via-[#fde68a] to-[#f59e0b]"></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>实测高</span>
+                                                            <span>实测中高</span>
+                                                            <span>实测中</span>
+                                                            <span>实测中低</span>
+                                                            <span>实测低</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">实测省份</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f0f9ff] via-[#7dd3fc] to-[#0ea5e9]"></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>市场高</span>
+                                                            <span>市场中高</span>
+                                                            <span>市场中</span>
+                                                            <span>市场中低</span>
+                                                            <span>市场低</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">市场区间省份</span>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                                                        实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。
+                                                        市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
