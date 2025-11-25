@@ -607,7 +607,7 @@
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
                                             + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度等级：<span style="font-weight:bold; color:${color};">${level}级</span></div>`
                                             + (remark ? `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${remark}</div>` : '')
-                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 点击进入详情</div>`;
+                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                     }
 
                                     if (params.data?.policyLevel) {
@@ -617,7 +617,7 @@
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
                                             + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">政策等级：<span style="font-weight:bold; color:${palette[level - 1] || palette[0]};">${levelInfo.label}</span></div>`
                                             + `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${levelInfo.desc}</div>`
-                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 点击进入详情</div>`;
+                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                     }
                                     if (params.data?.energyCategory) {
                                         const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
@@ -630,7 +630,7 @@
                                             + `<div style="font-size:12px; color:#0ea5e9; font-weight:600;">${display}</div>`
                                             + (note ? `<div style="font-size:12px; color:#64748b; margin-top:4px;">${note}</div>` : '')
                                             + rangeLine
-                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 双击进入省级地图</div>`;
                                     }
 
                                     if (marketType === 'frequency') {
@@ -644,7 +644,7 @@
                                             return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
                                                     + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">${colorDot} ${categoryLabel}: <span style="font-weight:bold; color:${currentPalette.map[1]};">${volume}</span></div>`
                                                     + (note ? `<div style="font-size:12px; color:#64748b; margin-bottom:4px;">${note}</div>` : '')
-                                                    + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                                    + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 双击进入省级地图</div>`;
                                         }
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`;
                                     }
@@ -655,7 +655,7 @@
                                             return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
                                                 + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">${info.totalVolume}</div>`
                                                 + `<div style="font-size:12px; color:#0f172a; line-height:1.5;">${info.marketVolumeDisplay}</div>`
-                                                + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 点击进入详情</div>`;
+                                                + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                         }
                                     }
                                     return params.name;
@@ -732,27 +732,26 @@
 
                     chart.off('click');
                     chart.on('click', (params) => {
-                        if (mode === 'china') {
-                            if (params.componentType !== 'series' || params.seriesType !== 'map') return;
-                            const clickedName = params.name;
-                            if (adcodeMap[clickedName] && currentData.details[clickedName]) {
-                                setCurrentProvince(clickedName);
-                                setSelectedProvinceInfo(currentData.details[clickedName]);
-                                setViewMode('province');
-                            } else {
-                                const provinceInfo = currentData.details[clickedName];
-                                if (provinceInfo) {
-                                    setSelectedProvinceInfo(provinceInfo);
-                                } else {
-                                    // 简单的fallback处理，电能量市场可能没有梯队信息
-                                    if (marketType === 'frequency') {
-                                        // ... 原有的梯队逻辑 ...
-                                        setSelectedProvinceInfo(null);
-                                    } else {
-                                        setSelectedProvinceInfo(null);
-                                    }
-                                }
-                            }
+                        if (mode !== 'china') return;
+                        if (params.componentType !== 'series' || params.seriesType !== 'map') return;
+                        const clickedName = params.name;
+                        const provinceInfo = currentData.details[clickedName];
+                        if (provinceInfo) {
+                            setSelectedProvinceInfo(provinceInfo);
+                        } else {
+                            setSelectedProvinceInfo(null);
+                        }
+                    });
+
+                    chart.off('dblclick');
+                    chart.on('dblclick', (params) => {
+                        if (mode !== 'china') return;
+                        if (params.componentType !== 'series' || params.seriesType !== 'map') return;
+                        const clickedName = params.name;
+                        if (adcodeMap[clickedName] && currentData.details[clickedName]) {
+                            setCurrentProvince(clickedName);
+                            setSelectedProvinceInfo(currentData.details[clickedName]);
+                            setViewMode('province');
                         }
                     });
 
@@ -905,7 +904,7 @@
                                                 </button>
                                             </div>
                                             <div className="text-[11px] text-slate-600 leading-relaxed">
-                                                在电能量板块自由切换价差视图、政策进程热力图与现货市场进程热力图。政策等级颜色由浅到深依次表示「无政策 → 经营主体包含储能 → 交易细则包含储能」，现货市场进程图则用0-5级渐变色表示成熟度与备注。
+                                                价差 / 政策 / 现货进程三张热力图可在此切换，颜色均按程度由浅到深递进显示。
                                             </div>
                                         </div>
                                     )}
@@ -948,8 +947,7 @@
                                                         <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">市场区间省份</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        图例仅保留价差区间的最高/最低约值（不带单位），对应热力图滑块两端，方便快速比较。
-                                                        实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                        图例显示滑块两端的约值（无单位），点击省份查看区间或备注。
                                                     </div>
                                                 </div>
                                             ) : energyView === 'spot-progress' ? (
@@ -968,7 +966,7 @@
                                                         </div>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        现货市场进程图以0-5级渐变色展示成熟度，0表示暂无进展或缺少信息，5为正式运行。悬停或点击可查看各省份的进展备注。
+                                                        0-5级逐级加深，0 为暂无信息，5 为正式运行；悬停或点击可查看备注。
                                                     </div>
                                                 </div>
                                             ) : (
@@ -986,7 +984,7 @@
                                                         <span className="text-indigo-700 font-semibold">3级：交易细则包含储能（最深色）</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        政策热力图在电能量板块中提供中长期（蓝色系）与现货（青色系）两张地图，可通过上方切换按钮选择。颜色从浅到深对应政策落地程度。
+                                                        颜色由浅到深对应政策落地程度，上方按钮可切换中长期与现货政策图。
                                                     </div>
                                                 </div>
                                             )}
