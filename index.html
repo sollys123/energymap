@@ -351,6 +351,19 @@
                 market: ['#f0f9ff', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9']
             };
 
+            const formatPriceLabel = (value) => `${value.toFixed(3)} 元/kWh`;
+
+            const buildScaleLabels = ({ min, max }, steps = 5) => {
+                if (!isFinite(min) || !isFinite(max)) return [];
+                const span = max - min;
+                if (span === 0) return Array(steps).fill(max);
+                const step = span / (steps - 1);
+                return Array.from({ length: steps }, (_, idx) => max - idx * step);
+            };
+
+            const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
+            const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
+
             const policyColorScale = ['#eef2ff', '#93c5fd', '#2563eb'];
 
             const getEnergyColor = (value, category) => {
@@ -801,22 +814,18 @@
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#fef3c7] via-[#fde68a] to-[#f59e0b]"></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
-                                                            <span>实测高</span>
-                                                            <span>实测中高</span>
-                                                            <span>实测中</span>
-                                                            <span>实测中低</span>
-                                                            <span>实测低</span>
+                                                            {actualScaleLabels.map((label, idx) => (
+                                                                <span key={`actual-scale-${idx}`}>{formatPriceLabel(label)}</span>
+                                                            ))}
                                                         </div>
                                                         <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">实测省份</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f0f9ff] via-[#7dd3fc] to-[#0ea5e9]"></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
-                                                            <span>市场高</span>
-                                                            <span>市场中高</span>
-                                                            <span>市场中</span>
-                                                            <span>市场中低</span>
-                                                            <span>市场低</span>
+                                                            {marketScaleLabels.map((label, idx) => (
+                                                                <span key={`market-scale-${idx}`}>{formatPriceLabel(label)}</span>
+                                                            ))}
                                                         </div>
                                                         <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">市场区间省份</span>
                                                     </div>
