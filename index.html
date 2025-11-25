@@ -411,7 +411,21 @@
                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                 borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                 formatter: (params) => {
-                                    if (params.seriesType === 'map') {
+                                    if (params.data?.energyCategory) {
+                                        const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
+                                        const display = energyData.displayMap[params.name] || params.value;
+                                        const note = energyData.noteMap[params.name];
+                                        const range = energyData.rangeMap[params.name];
+                                        const rangeLine = range ? `<div style="font-size:12px;color:#475569;margin-top:4px;">范围数值：${range[0]} ~ ${range[1]} 元/kWh</div>` : '';
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">类别：<span style="font-weight:bold; color:${currentPalette.map[1]};">${categoryLabel}</span></div>`
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:600;">${display}</div>`
+                                            + (note ? `<div style="font-size:12px; color:#64748b; margin-top:4px;">${note}</div>` : '')
+                                            + rangeLine
+                                            + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                    }
+
+                                    if (marketType === 'frequency') {
                                         if (!params.value) return `<div style="color:#94a3b8">${params.name} <br/>暂无数据</div>`;
                                         let colorDot = `<span style="display:inline-block;margin-right:6px;border-radius:50%;width:8px;height:8px;background-color:${Array.isArray(params.color) ? params.color[params.color.length-1] : params.color};"></span>`;
                                         if (params.value > 0) {
@@ -429,13 +443,19 @@
                                 }
                             },
                             ...(marketType === 'frequency' ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } } : {}),
-                            geo: {
-                                map: 'china', roam: true, zoom: 1.2, center: [104.114129, 37.550339],
+                            series: [{
+                                name: '市场分布',
+                                type: 'map',
+                                map: 'china',
+                                roam: true,
+                                zoom: 1.2,
+                                center: [104.114129, 37.550339],
                                 label: { show: true, fontSize: 10, color: 'rgba(0,0,0,0.5)' },
                                 itemStyle: { areaColor: '#f8fafc', borderColor: '#cbd5e1', borderWidth: 1 },
-                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } }
-                            },
-                            series: [{ name: '市场分布', type: 'map', geoIndex: 0, data: generateMapData(), selectedMode: false }]
+                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } },
+                                data: generateMapData(),
+                                selectedMode: false
+                            }]
                         };
                     } else {
                         // === 省份视图 ===
