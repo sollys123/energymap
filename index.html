@@ -56,7 +56,7 @@
             
             // --- 核心状态 ---
             const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
-            const [energyView, setEnergyView] = useState('price'); // 'price' | 'policy-long' | 'policy-spot'
+            const [energyView, setEnergyView] = useState('price'); // 'price' | 'policy-long' | 'policy-spot' | 'spot-progress'
             const [viewMode, setViewMode] = useState('china'); // 'china' | 'province'
             const [currentProvince, setCurrentProvince] = useState(null);
             const [selectedProvinceInfo, setSelectedProvinceInfo] = useState(null);
@@ -290,7 +290,8 @@
                 '黑龙江': '黑龙江省', '辽宁': '辽宁省', '甘肃': '甘肃省', '宁夏': '宁夏回族自治区',
                 '青海': '青海省', '陕西': '陕西省', '新疆': '新疆维吾尔自治区', '四川': '四川省',
                 '重庆': '重庆市', '广东': '广东省', '广西': '广西壮族自治区', '贵州': '贵州省',
-                '云南': '云南省', '海南': '海南省', '蒙西': '内蒙古自治区'
+                '云南': '云南省', '海南': '海南省', '蒙西': '内蒙古自治区', '蒙东': '内蒙古自治区',
+                '省间（国网、蒙西）': '跨省（国网-蒙西）', '省间(国网与蒙西)': '跨省（国网-蒙西）', '南方区域': '南方区域'
             };
 
             const normalizeProvince = (name) => provinceAlias[name] || name;
@@ -322,6 +323,39 @@
                 return { mapValues, details };
             };
 
+            const buildSpotProgressData = (entries) => {
+                const mapValues = {};
+                const details = {};
+                const remarkMap = {};
+
+                entries.forEach(([rawName, rawLevel, remark]) => {
+                    const name = normalizeProvince(rawName);
+                    const level = Math.max(0, Math.min(5, Number(rawLevel) || 0));
+                    const currentLevel = mapValues[name] ?? 0;
+                    const finalLevel = level > currentLevel ? level : currentLevel;
+
+                    if (adcodeMap[name]) {
+                        mapValues[name] = finalLevel;
+                    }
+
+                    remarkMap[name] = remark;
+                    details[name] = {
+                        title: `${name} 现货市场进程`,
+                        totalVolume: `成熟度等级：${finalLevel}级`,
+                        marketVolumeDisplay: remark || '暂无备注信息',
+                        tags: ['现货市场进程', `${finalLevel}级`],
+                        heatValue: finalLevel,
+                        remark,
+                        details: [
+                            { label: '成熟度等级', value: `${finalLevel}级` },
+                            remark ? { label: '进展说明', value: remark } : null
+                        ].filter(Boolean)
+                    };
+                });
+
+                return { mapValues, details, remarkMap };
+            };
+
             const longTermPolicyData = buildPolicyData([
                 ['北京', 1], ['天津', 3], ['河北南网', 3], ['冀北', 3], ['山东', 2], ['山西', 2],
                 ['安徽', 3], ['福建', 3], ['上海', 2], ['江苏', 2], ['浙江', 2], ['湖北', 2],
@@ -338,6 +372,44 @@
                 ['甘肃', 3], ['宁夏', 3], ['青海', 3], ['陕西', 3], ['新疆', 3], ['四川', 3],
                 ['重庆', 3], ['蒙西', 3], ['广东', 3], ['广西', 3], ['贵州', 3], ['云南', 3], ['海南', 3]
             ], '现货政策');
+
+            const spotProgressData = buildSpotProgressData([
+                ['北京', 0, '表格中未给出北京现货市场进程的具体说明'],
+                ['天津', 0, '表格中未给出天津现货市场进程的具体说明'],
+                ['河北南网', 4, '2023年9月开始首次结算试运行，2024年11月进行第二轮长周期结算试运行，2025年3月1日起开展连续结算试运行'],
+                ['冀北', 0, '表格中未给出冀北现货市场进程的具体说明'],
+                ['山东', 5, '自2021年12月起开展长周期不间断结算试运行并持续推进，2024年6月17日转入现货市场正式运行'],
+                ['山西', 5, '2021年4月起连续三个月开展结算试运行，2023年12月22日转入现货市场正式运行'],
+                ['安徽', 4, '2024年5月进行第一次整月结算试运行，2024年12月31日起开展连续结算试运行'],
+                ['福建', 3, '2024年11月开展首次全月结算试运行，2025年3月进入长周期结算试运行阶段'],
+                ['上海', 4, '2025年初多次结算试运行并在5月完成整月结算试运行，同年10月29日启动连续结算试运行'],
+                ['江苏', 4, '2024年12月完成第六次结算试运行，2025年6月1日开展长周期结算试运行并于9月起进入连续结算试运行'],
+                ['浙江', 5, '2024年5月启动长周期连续结算试运行，2025年8月7日起转入现货市场正式运行'],
+                ['湖北', 5, '2024年4月16日开展第二轮长周期结算试运行，2025年6月6日起转入现货市场正式运行'],
+                ['湖南', 4, '2024年11月开展首次整月结算试运行和后续结算试运行，2025年10月28日起启动连续结算试运行'],
+                ['河南', 3, '2024年5月15日至6月14日开展结算试运行，2025年9月开展整月结算试运行'],
+                ['江西', 4, '2023年6月14日首次结算试运行，2025年8月下旬至9月进行调电试运行并于10月1日起进入连续结算阶段'],
+                ['吉林', 4, '2024年11月中旬进行第一次结算试运行，2025年7月2日完成首次整月结算，并从9月1日起启动连续结算试运行'],
+                ['黑龙江', 4, '2022年12月先后开展模拟试运行和调电试运行，2025年8月1日起进行连续结算试运行'],
+                ['辽宁', 4, '2024年11月开展首次整月结算试运行，2025年3月1日起开展连续结算试运行'],
+                ['蒙东', 4, '2025年3月中旬开展首次结算试运行，7月31日完成整月结算试运行并于10月20日转入连续结算试运行'],
+                ['甘肃', 5, '2021年5月起开展连续不间断结算试运行，2024年9月5日转入现货市场正式运行'],
+                ['宁夏', 4, '2024年11月开展首次整月结算试运行，2025年5月下旬至7月开展多次结算试运行并计划自10月1日起进入连续结算试运行'],
+                ['青海', 4, '2024年11月上旬首次结算试运行，2025年多次结算试运行后自10月28日起开始连续试运行'],
+                ['陕西', 4, '2024年5月15日至6月13日开展整月结算试运行，并于2024年12月31日进入连续结算试运行'],
+                ['新疆', 4, '2024年12月下旬及2025年多次开展结算试运行，2025年10月11日转入更高级别的连续运行阶段'],
+                ['四川', 3, '2020年9月进行水电竞价连续720小时结算试运行，2022年7月开展水电现货调电试运行，2025年6月至9月安排模拟试运行'],
+                ['重庆', 4, '2024年11月完成首次整月结算试运行，2025年5月至6月进行长周期多月结算试运行并计划自11月1日起启动连续结算试运行'],
+                ['蒙西', 5, '2022年6月1日启动连续结算试运行，2025年2月24日转入现货市场正式运行'],
+                ['省间（国网、蒙西）', 5, '2022年1月启动试运行，2024年10月15日转入正式运行'],
+                ['广东', 5, '2019年5月启动现货市场结算试运行，2023年12月28日转入正式运行'],
+                ['广西', 4, '2024年11月开展全月结算试运行，2025年6月29日起转入连续结算试运行'],
+                ['贵州', 4, '2024年11月开展全月结算试运行，2025年6月29日起转入连续结算试运行'],
+                ['云南', 4, '2024年11月开展全月结算试运行，2025年6月29日起转入连续结算试运行'],
+                ['海南', 4, '2024年11月开展全月结算试运行，2025年6月29日起转入连续结算试运行'],
+                ['南方区域', 4, '南方区域整体在2024年11月开展全月结算试运行并于2025年6月29日起进入连续结算试运行'],
+                ['省间(国网与蒙西)', 6, '省间现货市场自2022年1月启动试运行并于2024年10月15日转入正式运行']
+            ]);
 
             // --- 辅助数据 ---
             const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省'];
@@ -366,6 +438,7 @@
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
             const policyColorScale = ['#eef2ff', '#93c5fd', '#2563eb'];
+            const spotProgressColorScale = ['#f8fafc', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#1d4ed8'];
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
@@ -379,6 +452,7 @@
             // --- 数据选择逻辑 ---
             const currentData = useMemo(() => {
                 if (marketType === 'frequency') return frequencyData;
+                if (energyView === 'spot-progress') return spotProgressData;
                 if (energyView === 'policy-long') return longTermPolicyData;
                 if (energyView === 'policy-spot') return spotPolicyData;
                 return energyData;
@@ -431,6 +505,17 @@
                                 itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
                                 emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
                                 energyCategory: category
+                            });
+                        } else if (energyView === 'spot-progress') {
+                            const level = values[name] ?? 0;
+                            const remark = currentData.remarkMap?.[name];
+                            data.push({
+                                name,
+                                value: level,
+                                itemStyle: { areaColor: spotProgressColorScale[level] || spotProgressColorScale[0], borderColor: '#fff', borderWidth: 1.2 },
+                                emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
+                                spotProgressLevel: level,
+                                remark
                             });
                         } else {
                             const level = values[name];
@@ -508,6 +593,16 @@
                                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                     borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                     formatter: (params) => {
+                                    if (params.data?.spotProgressLevel !== undefined) {
+                                        const level = params.data.spotProgressLevel;
+                                        const remark = params.data.remark || currentData.remarkMap?.[params.name];
+                                        const color = spotProgressColorScale[level] || spotProgressColorScale[0];
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度等级：<span style="font-weight:bold; color:${color};">${level}级</span></div>`
+                                            + (remark ? `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${remark}</div>` : '')
+                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 点击进入详情</div>`;
+                                    }
+
                                     if (params.data?.policyLevel) {
                                         const level = params.data.policyLevel;
                                         const levelInfo = policyLevelConfig[level] || policyLevelConfig[1];
@@ -697,11 +792,19 @@
 
             const energyViewTitle = energyView === 'price'
                 ? '电能量市场热力图'
-                : (energyView === 'policy-long' ? '电能量中长期政策热力图' : '电能量现货政策热力图');
+                : energyView === 'policy-long'
+                    ? '电能量中长期政策热力图'
+                    : energyView === 'policy-spot'
+                        ? '电能量现货政策热力图'
+                        : '现货市场进程热力图';
 
             const detailSummaryTitle = marketType === 'frequency'
                 ? '调频收益概览'
-                : (energyView === 'price' ? '电能量市场概览' : '电能量政策概览');
+                : energyView === 'price'
+                    ? '电能量市场概览'
+                    : energyView === 'spot-progress'
+                        ? '现货市场进程概览'
+                        : '电能量政策概览';
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
@@ -767,7 +870,7 @@
                                             <div className="text-[11px] text-indigo-700 font-semibold flex items-center gap-2">
                                                 <Layers size={12} /> 电能量视图选择
                                             </div>
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-4 gap-2">
                                                 <button
                                                     onClick={() => setEnergyView('price')}
                                                     className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-all ${energyView === 'price' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-700 bg-white/70'}`}
@@ -786,9 +889,15 @@
                                                 >
                                                     现货政策
                                                 </button>
+                                                <button
+                                                    onClick={() => setEnergyView('spot-progress')}
+                                                    className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-all ${energyView === 'spot-progress' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-700 bg-white/70'}`}
+                                                >
+                                                    现货市场进程
+                                                </button>
                                             </div>
                                             <div className="text-[11px] text-slate-600 leading-relaxed">
-                                                在电能量板块自由切换价差视图与政策进程热力图，政策等级颜色由浅到深依次表示「无政策 → 经营主体包含储能 → 交易细则包含储能」。
+                                                在电能量板块自由切换价差视图、政策进程热力图与现货市场进程热力图。政策等级颜色由浅到深依次表示「无政策 → 经营主体包含储能 → 交易细则包含储能」，现货市场进程图则用0-5级渐变色表示成熟度与备注。
                                             </div>
                                         </div>
                                     )}
@@ -797,7 +906,7 @@
                                     {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : '电能量政策热力图')}
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : energyView === 'spot-progress' ? '现货市场进程热力图' : '电能量政策热力图')}
                                             </div>
                                             {marketType === 'frequency' ? (
                                                 <div className="flex items-center gap-3">
@@ -833,6 +942,20 @@
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
                                                         图例仅保留价差区间的最高/最低约值（不带单位），对应热力图滑块两端，方便快速比较。
                                                         实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                    </div>
+                                                </div>
+                                            ) : energyView === 'spot-progress' ? (
+                                                <div className="space-y-3 text-[11px] text-slate-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-32 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f8fafc] via-[#cbd5e1] to-[#1d4ed8]"></div>
+                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
+                                                            {[5,4,3,2,1,0].map((level) => (
+                                                                <span key={`progress-${level}`}>{`${level}级`}</span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                                                        现货市场进程图以0-5级渐变色展示成熟度，0表示暂无进展或缺少信息，5为正式运行。悬停或点击可查看各省份的进展备注。
                                                     </div>
                                                 </div>
                                             ) : (
