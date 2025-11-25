@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电力市场综合热力图</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 2. React 全家桶 (Staticfile CDN) -->
+    <script crossorigin src="https://cdn.staticfile.net/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdn.staticfile.net/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Babel (Staticfile CDN) -->
+    <script src="https://cdn.staticfile.net/babel-standalone/7.22.20/babel.min.js"></script>
+    
+    <!-- 4. ECharts (Staticfile CDN) -->
+    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- 图标组件 ---
+        const IconWrapper = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const X = (props) => (<IconWrapper {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconWrapper>);
+        const Activity = (props) => (<IconWrapper {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconWrapper>);
+        const TrendingUp = (props) => (<IconWrapper {...props}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></IconWrapper>);
+        const BarChart3 = (props) => (<IconWrapper {...props}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></IconWrapper>);
+        const Coins = (props) => (<IconWrapper {...props}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></IconWrapper>);
+        const Zap = (props) => (<IconWrapper {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconWrapper>);
+        const ArrowLeft = (props) => (<IconWrapper {...props}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconWrapper>);
+        const MapIcon = (props) => (<IconWrapper {...props}><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></IconWrapper>);
+        const ChevronLeft = (props) => (<IconWrapper {...props}><path d="m15 18-6-6 6-6"/></IconWrapper>);
+        const ChevronRight = (props) => (<IconWrapper {...props}><path d="m9 18 6-6-6-6"/></IconWrapper>);
+        const Layers = (props) => (<IconWrapper {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></IconWrapper>);
+        const BatteryCharging = (props) => (<IconWrapper {...props}><path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19"/><line x1="23" x2="23" y1="13" y2="11"/><polyline points="11 6 7 12 13 12 9 18"/></IconWrapper>);
+
+        const EnergyMarketMap = () => {
+            const mapContainerRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+            
+            // --- 核心状态 ---
+            const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
+            const [viewMode, setViewMode] = useState('china'); // 'china' | 'province'
+            const [currentProvince, setCurrentProvince] = useState(null);
+            const [selectedProvinceInfo, setSelectedProvinceInfo] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+            // --- 省份 Adcode 映射 ---
+            const adcodeMap = {
+                '河北省': 130000, '山西省': 140000, '广东省': 440000,
+                '甘肃省': 620000, '河南省': 410000, '宁夏回族自治区': 640000
+            };
+
+            // --- 配置定义 ---
+            
+            // 1. 颜色配置 (根据市场类型切换)
+            const colorPalettes = {
+                frequency: {
+                    // 红/橙/黄暖色系 (代表热度/收益)
+                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'], 
+                    highlight: '#d97706',
+                    iconBg: 'bg-red-50', iconText: 'text-red-600', iconBorder: 'border-red-100',
+                    gradientFrom: 'from-red-600', gradientTo: 'to-orange-500'
+                },
+                energy: {
+                    // 蓝/紫冷色系 (代表电量/负荷)
+                    map: ['#1e1b4b', '#312e81', '#4338ca', '#6366f1', '#a5b4fc'], 
+                    highlight: '#4f46e5',
+                    iconBg: 'bg-indigo-50', iconText: 'text-indigo-600', iconBorder: 'border-indigo-100',
+                    gradientFrom: 'from-indigo-600', gradientTo: 'to-blue-500'
+                }
+            };
+
+            const currentPalette = colorPalettes[marketType];
+
+            // 2. 点位类型配置
+            const pointTypeConfig = {
+                'N': { color: '#22c55e', symbol: 'circle', label: '新能源 (风/光)', beltColor: '#86efac' },
+                'F': { color: '#7e22ce', symbol: 'rect', label: '火电/煤电', beltColor: '#d8b4fe' },
+                'S': { color: '#0ea5e9', symbol: 'triangle', label: '调节/水电/核电', beltColor: '#7dd3fc' },
+                // 电能量市场可能用到的新类型 (预留)
+                'L': { color: '#f59e0b', symbol: 'diamond', label: '负荷中心', beltColor: '#fcd34d' } 
+            };
+
+            // --- 数据源 ---
+
+            // A. 二次调频数据 (Frequency Data) - 沿用之前的数据
+            const frequencyData = {
+                mapValues: {
+                    '河北省': 5000, '河南省': 4000, '广东省': 5000, 
+                    '山西省': 4100, '甘肃省': 2500, '宁夏回族自治区': 500
+                },
+                details: {
+                    '河北省': {
+                        title: '河北省 (南网)', totalVolume: '5000万元 (储能份额)',
+                        marketVolumeDisplay: '每月储能分摊份额约 5000万元',
+                        tags: ['热度最高', '2026开放'],
+                        details: [{ label: '数据来源', value: '河北南网交易中心市场处主任' }]
+                    },
+                    '河南省': {
+                        title: '河南省', totalVolume: '4000万元 (储能份额)',
+                        marketVolumeDisplay: '每月储能分摊份额约 4000万元',
+                        tags: ['热度高', '2027开放'],
+                        details: [{ label: '数据来源', value: '河南调度计划处主任' }]
+                    },
+                    '广东省': {
+                        title: '广东省', totalVolume: '5000万元',
+                        marketVolumeDisplay: '每月独立储能市场总量 5000万元左右',
+                        tags: ['数据详实', '收益占比90%'],
+                        details: [{ label: '数据来源', value: '5-7月收益表' }]
+                    },
+                    '山西省': {
+                        title: '山西省', totalVolume: '4100万元',
+                        marketVolumeDisplay: '每月市场总量 4100万元',
+                        tags: ['市场成熟', '占比80%'],
+                        details: [{ label: '数据来源', value: '实地调研 (1-3月收益表)' }]
+                    },
+                    '甘肃省': {
+                        title: '甘肃省', totalVolume: '2500万元',
+                        marketVolumeDisplay: '每月全市场调频总金额 2500-2600万元',
+                        tags: ['趋势上涨', '半公开披露'],
+                        details: [{ label: '数据来源', value: '甘肃电力交易中心半公开披露信息' }]
+                    },
+                    '宁夏回族自治区': {
+                        title: '宁夏回族自治区', totalVolume: '500万元',
+                        marketVolumeDisplay: '每月总量 500万元左右',
+                        tags: ['涨幅不大', '占比5%'],
+                        details: [{ label: '数据来源', value: '实地调研' }]
+                    }
+                },
+                provincePoints: {
+                    '甘肃省': [
+                        { name: '陇东基地', coord: [107.63, 35.73], type: 'F', label: '陇东煤电基地', desc: '坑口煤电+外送中心' },
+                        { name: '刘家峡', coord: [103.35, 35.93], type: 'S', label: '黄河梯级水电', desc: '刘家峡调峰主力' }
+                    ],
+                    '宁夏回族自治区': [
+                        { name: '宁东基地', coord: [106.66, 38.16], type: 'F', label: '宁东能源化工', desc: '煤电+化工+光伏' },
+                        { name: '腾格里', coord: [105.00, 37.60], type: 'N', label: '腾格里基地', desc: '沙漠光伏/风电' },
+                        { name: '中宁换流站', coord: [105.67, 37.48], type: 'S', label: '中宁换流站', desc: '宁电入湘送端' }
+                    ],
+                    '河南省': [
+                        { name: '平顶山', coord: [113.19, 33.76], type: 'F', label: '平顶山煤电', desc: '中原煤电中心' },
+                        { name: '豫西风电', coord: [111.50, 34.50], type: 'N', label: '豫西风电', desc: '洛阳西部山区' },
+                        { name: '豫东光伏', coord: [114.50, 34.60], type: 'N', label: '豫东光伏', desc: '开封周边集中式' }
+                    ],
+                    '河北省': [
+                        { name: '石家庄', coord: [114.48, 38.03], type: 'F', label: '石家庄热电', desc: '省会负荷中心' },
+                        { name: '冀南光伏', coord: [115.68, 37.73], type: 'N', label: '冀南光伏', desc: '衡水平原光伏带' }
+                    ],
+                    '广东省': [
+                        { name: '粤西煤电', coord: [110.35, 21.27], type: 'F', label: '粤西煤电', desc: '湛江沿海基地' },
+                        { name: '粤东煤电', coord: [116.37, 23.55], type: 'F', label: '粤东煤电', desc: '揭阳/惠来基地' },
+                        { name: '阳江风电', coord: [111.98, 21.4], type: 'N', label: '阳江海上风电', desc: '近海风电集群' },
+                        { name: '汕尾风电', coord: [115.6, 22.6], type: 'N', label: '汕尾海上风电', desc: '甲子海域' }
+                    ]
+                },
+                provinceBelts: {
+                    '甘肃省': [{ name: '河西走廊新能源带', type: 'N', coords: [[98.50, 39.75], [96.5, 40.5]], label: '酒泉-瓜州-玉门 基地带' }],
+                    '河南省': [{ name: '豫北煤电带', type: 'F', coords: [[114.35, 36.10], [114.29, 35.74]], label: '安阳-鹤壁 煤电带' }],
+                    '河北省': [{ name: '冀南钢铁煤电带', type: 'F', coords: [[114.50, 37.06], [114.47, 36.60]], label: '邢台-邯郸 煤电钢铁带' }],
+                    '广东省': [{ name: '珠江口核电走廊', type: 'S', coords: [[112.93, 21.92], [114.54, 22.60], [114.8, 22.7]], label: '珠江口核电走廊' }]
+                }
+            };
+
+            // B. 电能量数据 (Energy Data) - 目前为空/占位，等待您填充
+            const energyData = {
+                mapValues: {
+                    // 示例占位：假设一些省份有电能量数据，用不同的数值范围
+                    '江苏省': 8000, '山东省': 7500, '广东省': 9000, '浙江省': 7000
+                },
+                details: {
+                    '广东省': {
+                        title: '广东省 (电能量)', totalVolume: '待填充',
+                        marketVolumeDisplay: '现货市场交易活跃',
+                        tags: ['现货试点', '负荷中心'],
+                        details: [{ label: '说明', value: '等待录入具体数据' }]
+                    }
+                    // ... 更多省份
+                },
+                provincePoints: {
+                    // 等待录入
+                },
+                provinceBelts: {
+                    // 等待录入
+                }
+            };
+
+            // --- 辅助数据 ---
+            const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省']; 
+            const blueProvinces = ['贵州省', '云南省', '广西壮族自治区', '湖南省', '湖北省', '江西省', '内蒙古自治区'];
+            const lightBlueProvinces = ['新疆维吾尔自治区', '黑龙江省', '吉林省', '辽宁省', '青海省'];
+
+            // --- 数据选择逻辑 ---
+            const currentData = marketType === 'frequency' ? frequencyData : energyData;
+
+            // --- 数据转换函数 ---
+            const convertPointData = (data) => {
+                if(!data) return [];
+                return data.map(item => {
+                    const cfg = pointTypeConfig[item.type];
+                    return {
+                        name: item.name,
+                        value: item.coord.concat(100),
+                        symbol: cfg?.symbol || 'circle',
+                        itemStyle: { 
+                            color: cfg?.color || '#666', 
+                            borderColor: '#fff', borderWidth: 2, shadowBlur: 5, shadowColor: 'rgba(0,0,0,0.5)' 
+                        },
+                        tooltipData: item
+                    };
+                });
+            };
+            const convertBeltBorderData = (data) => data ? data.map(item => ({ coords: item.coords, name: item.label })) : [];
+            const convertBeltFillData = (data) => {
+                if(!data) return [];
+                return data.map(item => {
+                    const cfg = pointTypeConfig[item.type];
+                    return {
+                        coords: item.coords,
+                        lineStyle: { color: cfg?.beltColor || '#ccc' },
+                        name: item.label,
+                        tooltipData: { label: item.label, desc: '区域/走廊/产业带', type: item.type }
+                    };
+                });
+            };
+            
+            // 生成热力图数据 (根据当前市场类型)
+            const generateMapData = () => {
+                const data = [];
+                const values = currentData.mapValues || {};
+                Object.keys(values).forEach(name => data.push({ name: name, value: values[name] }));
+                
+                // 只有在调频市场时才显示这些特定的蓝梯队背景？或者电能量市场也用？
+                // 暂时假设只有调频市场有明确的梯队概念，电能量市场只显示有数据的省份
+                if (marketType === 'frequency') {
+                    deepBlueProvinces.forEach(name => !values[name] && data.push({ name, value: -3 }));
+                    blueProvinces.forEach(name => !values[name] && data.push({ name, value: -2 }));
+                    lightBlueProvinces.forEach(name => !values[name] && data.push({ name, value: -1 }));
+                }
+                return data;
+            };
+
+            // --- 加载地图 ---
+            const loadMap = async (mode, provinceName = null) => {
+                setLoading(true);
+                try {
+                    let geoJsonUrl = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+                    let mapName = 'china';
+
+                    if (mode === 'province' && provinceName) {
+                        const adcode = adcodeMap[provinceName];
+                        if (adcode) {
+                            geoJsonUrl = `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
+                            mapName = provinceName;
+                        }
+                    }
+
+                    const response = await fetch(geoJsonUrl);
+                    const geoJson = await response.json();
+                    
+                    if (!window.echarts) return;
+                    
+                    window.echarts.registerMap(mapName, geoJson);
+                    
+                    if (chartInstanceRef.current) {
+                        chartInstanceRef.current.dispose();
+                    }
+                    
+                    const chart = window.echarts.init(mapContainerRef.current);
+                    chartInstanceRef.current = chart;
+
+                    let option = {};
+
+                    if (mode === 'china') {
+                        // === 全国视图 ===
+                        // 根据市场类型动态设置 VisualMap 颜色
+                        const pieces = marketType === 'frequency' ? [
+                            { min: 4900, label: '5000万', color: currentPalette.map[0] }, 
+                            { min: 4050, max: 4899, label: '4100万', color: currentPalette.map[1] }, 
+                            { min: 3000, max: 4049, label: '4000万', color: currentPalette.map[2] }, 
+                            { min: 1000, max: 2999, label: '2500万', color: currentPalette.map[3] }, 
+                            { min: 0, max: 999, label: '500万', color: currentPalette.map[4] }, 
+                            { value: -3, label: '第一梯队', color: '#1d4ed8' },
+                            { value: -2, label: '第二梯队', color: '#60a5fa' },
+                            { value: -1, label: '第三梯队', color: '#bfdbfe' }
+                        ] : [
+                            // 电能量市场的 VisualMap (示例蓝紫色系)
+                            { min: 8000, label: '特高', color: currentPalette.map[0] },
+                            { min: 6000, max: 7999, label: '高', color: currentPalette.map[1] },
+                            { min: 4000, max: 5999, label: '中', color: currentPalette.map[2] },
+                            { min: 2000, max: 3999, label: '低', color: currentPalette.map[3] },
+                            { min: 0, max: 1999, label: '很低', color: currentPalette.map[4] }
+                        ];
+
+                        option = {
+                            backgroundColor: 'transparent',
+                            grid: { left: '5%', right: '5%', top: '5%', bottom: '5%' },
+                            tooltip: {
+                                trigger: 'item',
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
+                                formatter: (params) => {
+                                    if (params.seriesType === 'map') {
+                                        if (!params.value) return `<div style="color:#94a3b8">${params.name} <br/>暂无数据</div>`;
+                                        let colorDot = `<span style="display:inline-block;margin-right:6px;border-radius:50%;width:8px;height:8px;background-color:${params.color};"></span>`;
+                                        if (params.value > 0) {
+                                            const info = currentData.details[params.name] || {};
+                                            const volume = info.totalVolume || params.value;
+                                            return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>
+                                                    <div style="font-size:12px; color:#475569; margin-bottom:6px;">${colorDot} 总量: <span style="font-weight:bold; color:${currentPalette.map[1]};">${volume}</span></div>
+                                                    <div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                        }
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`;
+                                    }
+                                }
+                            },
+                            visualMap: { show: false, type: 'piecewise', pieces: pieces },
+                            geo: {
+                                map: 'china', roam: true, zoom: 1.2, center: [104.114129, 37.550339],
+                                label: { show: true, fontSize: 10, color: 'rgba(0,0,0,0.5)' },
+                                itemStyle: { areaColor: '#f8fafc', borderColor: '#cbd5e1', borderWidth: 1 },
+                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } }
+                            },
+                            series: [{ name: '市场分布', type: 'map', geoIndex: 0, data: generateMapData(), selectedMode: false }]
+                        };
+                    } else {
+                        // === 省份视图 ===
+                        const pPoints = (currentData.provincePoints || {})[provinceName] || [];
+                        const pBelts = (currentData.provinceBelts || {})[provinceName] || [];
+
+                        option = {
+                            backgroundColor: 'transparent',
+                            tooltip: {
+                                trigger: 'item',
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
+                                formatter: (params) => {
+                                    if (params.seriesType === 'effectScatter' || (params.seriesType === 'lines' && params.seriesName === '能源走廊')) {
+                                        const d = params.data.tooltipData;
+                                        const typeInfo = pointTypeConfig[d.type] || { label: '未知' };
+                                        return `<div style="font-weight:bold; margin-bottom:2px; color:${params.color}">${d.label}</div>
+                                                <div style="font-size:12px;color:#64748b; margin-bottom:4px;">${d.desc || ''}</div>
+                                                <div style="font-size:10px;color:#94a3b8;">类型: ${typeInfo.label}</div>`;
+                                    }
+                                    return params.name;
+                                }
+                            },
+                            geo: {
+                                map: mapName, roam: true, zoom: 1.0,
+                                label: { show: true, color: '#64748b' },
+                                itemStyle: { areaColor: '#e2e8f0', borderColor: '#94a3b8', borderWidth: 1.5, shadowColor: 'rgba(0, 0, 0, 0.2)', shadowBlur: 10 },
+                                emphasis: { itemStyle: { areaColor: '#cbd5e1' }, label: { color: '#0f172a' } }
+                            },
+                            series: [
+                                {
+                                    name: '能源走廊边框', type: 'lines', coordinateSystem: 'geo', polyline: true,
+                                    data: convertBeltBorderData(pBelts),
+                                    lineStyle: { width: 26, color: 'rgba(255, 255, 255, 0.95)', cap: 'round', join: 'round', shadowBlur: 8, shadowColor: 'rgba(255, 255, 255, 0.8)' },
+                                    silent: true, zlevel: 1.5
+                                },
+                                {
+                                    name: '能源走廊', type: 'lines', coordinateSystem: 'geo', polyline: true,
+                                    data: convertBeltFillData(pBelts),
+                                    lineStyle: { width: 20, opacity: 0.65, cap: 'round', join: 'round' },
+                                    silent: false, zlevel: 1.6
+                                },
+                                {
+                                    name: '能源基地', type: 'effectScatter', coordinateSystem: 'geo',
+                                    data: convertPointData(pPoints),
+                                    symbolSize: 18, showEffectOn: 'render', rippleEffect: { brushType: 'fill', scale: 2 },
+                                    hoverAnimation: true, label: { show: false }, zlevel: 2
+                                }
+                            ]
+                        };
+                    }
+
+                    chart.setOption(option);
+                    setLoading(false);
+
+                    chart.off('click');
+                    chart.on('click', (params) => {
+                        if (mode === 'china') {
+                            if (params.componentType !== 'series' || params.seriesType !== 'map') return;
+                            const clickedName = params.name;
+                            if (adcodeMap[clickedName] && currentData.details[clickedName]) {
+                                setCurrentProvince(clickedName);
+                                setSelectedProvinceInfo(currentData.details[clickedName]);
+                                setViewMode('province');
+                            } else {
+                                const provinceInfo = currentData.details[clickedName];
+                                if (provinceInfo) {
+                                    setSelectedProvinceInfo(provinceInfo);
+                                } else {
+                                    // 简单的fallback处理，电能量市场可能没有梯队信息
+                                    if (marketType === 'frequency') {
+                                        // ... 原有的梯队逻辑 ...
+                                        setSelectedProvinceInfo(null);
+                                    } else {
+                                        setSelectedProvinceInfo(null);
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                } catch (error) {
+                    console.error('Map loading failed:', error);
+                    setLoading(false);
+                }
+            };
+
+            // 监听变化
+            useEffect(() => {
+                loadMap(viewMode, currentProvince);
+            }, [viewMode, currentProvince, marketType]); // 增加 marketType 依赖
+
+            // 切换市场时重置视图
+            useEffect(() => {
+                setViewMode('china');
+                setCurrentProvince(null);
+                setSelectedProvinceInfo(null);
+            }, [marketType]);
+
+            useEffect(() => {
+                const handleResize = () => chartInstanceRef.current && chartInstanceRef.current.resize();
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            const handleBack = () => {
+                setViewMode('china');
+                setCurrentProvince(null);
+                setSelectedProvinceInfo(null); 
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
+                    <header className="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10 shrink-0 relative">
+                        <div className="flex items-center space-x-3">
+                            {viewMode === 'province' ? (
+                                <button onClick={handleBack} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-medium">
+                                    <ArrowLeft size={16} /> 返回全国
+                                </button>
+                            ) : (
+                                <div className={`bg-gradient-to-br ${currentPalette.gradientFrom} ${currentPalette.gradientTo} p-2.5 rounded-xl text-white shadow-md transition-all duration-500`}>
+                                    <Activity size={24} />
+                                </div>
+                            )}
+                            
+                            <div>
+                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                                    {viewMode === 'province' ? `${currentProvince}详情` : (marketType === 'frequency' ? '二次调频市场热力图' : '电能量市场热力图')}
+                                </h1>
+                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                    <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${currentPalette.iconBg} ${currentPalette.iconText} ${currentPalette.iconBorder}`}>
+                                        {viewMode === 'province' ? <MapIcon size={12} /> : <Zap size={12} fill="currentColor" />}
+                                        <span>{viewMode === 'province' ? '省内微观视角' : '全国宏观视角'}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 relative w-full h-full overflow-hidden">
+                        <div className="w-full h-full bg-slate-50 flex">
+                            
+                            {/* --- 左侧伸缩面板 --- */}
+                            <div className={`absolute left-0 top-0 bottom-0 z-40 bg-white/95 backdrop-blur shadow-xl border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full overflow-hidden'}`}>
+                                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                                    <div className="flex items-center gap-2 text-slate-700 font-bold">
+                                        <Layers size={18} />
+                                        <span>市场视图切换</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-4 overflow-y-auto flex-1 space-y-6">
+                                    
+                                    {/* 0. 市场类型切换器 (核心功能) */}
+                                    <div className="p-1 bg-slate-100 rounded-lg flex gap-1">
+                                        <button 
+                                            onClick={() => setMarketType('frequency')}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Activity size={14} /> 二次调频
+                                        </button>
+                                        <button 
+                                            onClick={() => setMarketType('energy')}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'energy' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <BatteryCharging size={14} /> 电能量
+                                        </button>
+                                    </div>
+
+                                    {/* 1. 收益/热度图例 */}
+                                    {viewMode === 'china' && (
+                                        <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
+                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量规模 (热度)'}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`h-32 w-2 rounded-full shadow-inner bg-gradient-to-b ${marketType === 'frequency' ? 'from-[#991b1b] via-[#ea580c] to-[#fef08a]' : 'from-[#1e1b4b] via-[#4338ca] to-[#a5b4fc]'}`}></div>
+                                                <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
+                                                    <span>高</span>
+                                                    <span>中高</span>
+                                                    <span>中</span>
+                                                    <span>中低</span>
+                                                    <span>低</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="border-t border-slate-100"></div>
+
+                                    {/* 2. 能源基地类型图例 */}
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">能源基地图例</div>
+                                        <div className="space-y-2 text-xs text-slate-700">
+                                            {Object.entries(pointTypeConfig).map(([key, cfg]) => (
+                                                <div key={key} className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
+                                                    {cfg.symbol === 'circle' && <div className="w-3 h-3 rounded-full border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
+                                                    {cfg.symbol === 'rect' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
+                                                    {cfg.symbol === 'triangle' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color, clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'}}></div>}
+                                                    {cfg.symbol === 'diamond' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0 rotate-45" style={{backgroundColor: cfg.color}}></div>}
+                                                    <span>{cfg.label}</span>
+                                                </div>
+                                            ))}
+                                            <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
+                                                <div className="w-8 h-3 bg-slate-300 rounded border border-white shadow-sm flex items-center justify-center relative flex-shrink-0">
+                                                    <div className="w-6 h-1 bg-slate-400/50 rounded-full"></div>
+                                                </div>
+                                                <span className="text-slate-500">走廊/产业带</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. 梯队信息 (仅调频显示) */}
+                                    {marketType === 'frequency' && viewMode === 'china' && (
+                                        <>
+                                            <div className="border-t border-slate-100"></div>
+                                            <div className="space-y-3">
+                                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">潜在市场 (梯队)</div>
+                                                <div className="space-y-2 text-xs text-slate-700">
+                                                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded bg-[#1d4ed8]"></div><span>第一梯队</span></div>
+                                                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded bg-[#60a5fa]"></div><span>第二梯队</span></div>
+                                                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded bg-[#bfdbfe]"></div><span>第三梯队</span></div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    
+                                    <div className="pt-4 text-center">
+                                        <div className="text-[10px] text-slate-300 border border-dashed border-slate-200 rounded p-2 hover:border-slate-300 hover:text-slate-400 cursor-pointer transition-colors">
+                                            + 添加更多筛选器 (预留)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className={`absolute top-4 z-30 bg-white p-2 rounded-r-lg shadow-md border border-l-0 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all duration-300 ${isSidebarOpen ? 'left-72' : 'left-0'}`}
+                            >
+                                {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                            </button>
+
+                            <div className="flex-1 relative">
+                                {loading && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 bg-slate-50 z-50">
+                                        <div className="w-8 h-8 border-4 border-current border-t-transparent rounded-full animate-spin text-blue-500"></div>
+                                        <span className="text-sm">正在重绘地图...</span>
+                                    </div>
+                                )}
+                                <div ref={mapContainerRef} className="w-full h-full cursor-pointer" />
+                            </div>
+                        </div>
+
+                        {/* 右侧详情面板 */}
+                        <div className={`absolute right-0 top-0 bottom-0 z-30 w-full md:w-[400px] bg-white shadow-2xl md:border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${selectedProvinceInfo ? 'translate-x-0' : 'translate-x-full'}`}>
+                            {selectedProvinceInfo && (
+                                <>
+                                    <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-br from-slate-50 to-white">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1"><h2 className="text-2xl font-bold text-slate-800">{selectedProvinceInfo.title}</h2></div>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
+                                                {selectedProvinceInfo.tags && selectedProvinceInfo.tags.map((tag, i) => <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">{tag}</span>)}
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setSelectedProvinceInfo(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={24} /></button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
+                                        {/* 动态卡片颜色 */}
+                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-red-100 shadow-red-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
+                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-red-50' : 'from-indigo-50'}`}></div>}
+                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-red-600' : 'text-indigo-600'}`}>
+                                                {marketType === 'frequency' ? <Coins size={20} /> : <Zap size={20} />}
+                                                <span>{marketType === 'frequency' ? '调频收益概览' : '电能量市场概览'}</span>
+                                            </div>
+                                            <p className="text-lg text-slate-800 font-medium leading-relaxed">{selectedProvinceInfo.marketVolumeDisplay}</p>
+                                        </div>
+                                        
+                                        {selectedProvinceInfo.details && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider"><BarChart3 size={14} />详细数据 / 调研情况</div>
+                                                <div className="bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100">
+                                                    {selectedProvinceInfo.details.map((item, idx) => (
+                                                        <div key={idx} className="p-4 flex flex-col gap-1.5 hover:bg-slate-50/80 transition-colors">
+                                                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-slate-400"></span>{item.label}</span>
+                                                            <span className="text-slate-900 text-sm leading-relaxed pl-2 border-l-2 border-slate-200">{item.value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EnergyMarketMap />);
+    </script>
+</body>
+</html>
