@@ -65,7 +65,15 @@
             // --- 省份 Adcode 映射 ---
             const adcodeMap = {
                 '河北省': 130000, '山西省': 140000, '广东省': 440000,
-                '甘肃省': 620000, '河南省': 410000, '宁夏回族自治区': 640000
+                '甘肃省': 620000, '河南省': 410000, '宁夏回族自治区': 640000,
+                '江苏省': 320000, '浙江省': 330000, '陕西省': 610000,
+                '北京市': 110000, '天津市': 120000, '山东省': 370000,
+                '安徽省': 340000, '福建省': 350000, '上海市': 310000,
+                '湖北省': 420000, '湖南省': 430000, '江西省': 360000,
+                '吉林省': 220000, '黑龙江省': 230000, '辽宁省': 210000,
+                '内蒙古自治区': 150000, '青海省': 630000, '新疆维吾尔自治区': 650000,
+                '四川省': 510000, '重庆市': 500000, '广西壮族自治区': 450000,
+                '贵州省': 520000, '云南省': 530000, '海南省': 460000
             };
 
             // --- 配置定义 ---
@@ -179,33 +187,111 @@
                 }
             };
 
-            // B. 电能量数据 (Energy Data) - 目前为空/占位，等待您填充
-            const energyData = {
-                mapValues: {
-                    // 示例占位：假设一些省份有电能量数据，用不同的数值范围
-                    '江苏省': 8000, '山东省': 7500, '广东省': 9000, '浙江省': 7000
-                },
-                details: {
-                    '广东省': {
-                        title: '广东省 (电能量)', totalVolume: '待填充',
-                        marketVolumeDisplay: '现货市场交易活跃',
-                        tags: ['现货试点', '负荷中心'],
-                        details: [{ label: '说明', value: '等待录入具体数据' }]
-                    }
-                    // ... 更多省份
-                },
-                provincePoints: {
-                    // 等待录入
-                },
-                provinceBelts: {
-                    // 等待录入
-                }
+            // B. 电能量数据 (Energy Data)
+            const rawEnergyPriceData = {
+                '北京市': { range: [0.318, 0.596], display: '0.318~0.596 元/kWh', note: '华北：峰谷价差区间', category: 'market' },
+                '天津市': { value: 0.51, display: '0.51 元/kWh', note: '华北：单次谷充峰放测算', category: 'market' },
+                '河北省': { range: [0.43, 0.6], display: '0.43–0.6 元/kWh', note: '两充两放价差约 0.43；一充一放约 0.6', category: 'actual' },
+                '山东省': { value: 0.601, display: '0.601 元/kWh', note: '华北：单次谷充峰放', category: 'market' },
+                '山西省': { value: 0.45, display: '0.45 元/kWh', note: '华北：测算价差', category: 'actual' },
+                '安徽省': { range: [0.257, 0.607], display: '0.257~0.607 元/kWh', note: '华东：峰谷价差区间', category: 'market' },
+                '福建省': { range: [0.216, 0.452], display: '0.216~0.452 元/kWh', note: '华东：峰谷价差区间', category: 'market' },
+                '上海市': { value: 0.679, display: '0.679 元/kWh（只能做一次谷充峰放）', note: '华东：单次操作', category: 'market' },
+                '江苏省': { value: 0.2, display: '0.2 元/kWh', note: '华东：实测价差', category: 'actual' },
+                '浙江省': { value: 0.1, display: '0.1 元/kWh', note: '华东：实测价差', category: 'actual' },
+                '河南省': { value: 0.4, display: '0.4 元/kWh', note: '华中：实测价差', category: 'actual' },
+                '湖北省': { range: [0.229, 0.562], display: '0.229~0.562 元/kWh（全年 2 小时尖峰）', note: '华中：两小时尖峰窗口', category: 'market' },
+                '湖南省': { range: [0.246, 0.492], display: '0.246~0.492 元/kWh', note: '华中：峰谷价差区间', category: 'market' },
+                '江西省': { range: [0.273, 0.547], display: '0.273~0.547 元/kWh', note: '华中：峰谷价差区间', category: 'market' },
+                '吉林省': { value: 0.469, display: '0.469 元/kWh', note: '东北：单次谷充峰放', category: 'market' },
+                '黑龙江省': { value: 0.395, display: '0.395 元/kWh', note: '东北：单次谷充峰放', category: 'market' },
+                '辽宁省': { value: 0.423, display: '0.423 元/kWh', note: '东北：单次谷充峰放', category: 'market' },
+                '内蒙古自治区': { range: [0.223, 0.407], display: '蒙东：0.342；蒙西：0.223~0.407 元/kWh', note: '蒙东全年两次谷段充电 + 高峰放电；蒙西为峰谷区间', category: 'market' },
+                '甘肃省': { value: 0.27, display: '0.27 元/kWh（河西均价约 0.27）', note: '454 个节点，河西均价约 0.27', category: 'actual' },
+                '宁夏回族自治区': { value: 0.32, display: '0.32 元/kWh（可做金融套利）', note: '可做金融套利', category: 'actual' },
+                '青海省': { range: [0.231, 0.455], display: '0.231~0.455 元/kWh', note: '西北：峰谷价差区间', category: 'market' },
+                '陕西省': { value: 0.4, display: '0.4 元/kWh', note: '西北：实测价差', category: 'actual' },
+                '新疆维吾尔自治区': { range: [0.136, 0.290], display: '0.136~0.290 元/kWh', note: '西北：峰谷价差区间', category: 'market' },
+                '四川省': { range: [0.166, 0.332], display: '0.166~0.332 元/kWh', note: '西南：峰谷价差区间', category: 'market' },
+                '重庆市': { range: [0.262, 0.533], display: '0.262~0.533 元/kWh', note: '西南：峰谷价差区间', category: 'market' },
+                '广东省': { value: 0.18, display: '0.18 元/kWh', note: '南网：实测价差', category: 'actual' },
+                '广西壮族自治区': { range: [0.205, 0.411], display: '0.205~0.411 元/kWh', note: '南网：峰谷价差区间', category: 'market' },
+                '贵州省': { range: [0.231, 0.463], display: '0.231~0.463 元/kWh', note: '南网：峰谷价差区间', category: 'market' },
+                '云南省': { value: 0.28, display: '0.28 元/kWh', note: '南网：单次谷充峰放', category: 'market' },
+                '海南省': { range: [0.397, 0.737], display: '0.397~0.737 元/kWh', note: '南网：峰谷价差区间', category: 'market' }
             };
 
+            const buildEnergyData = () => {
+                const mapValues = {};
+                const details = {};
+                const categoryMap = {};
+                const displayMap = {};
+                const noteMap = {};
+                const rangeMap = {};
+                const actualValues = [];
+                const marketValues = [];
+
+                Object.entries(rawEnergyPriceData).forEach(([name, info]) => {
+                    const midValue = info.value ?? (((info.range?.[0] || 0) + (info.range?.[1] || 0)) / 2);
+                    mapValues[name] = midValue;
+                    categoryMap[name] = info.category;
+                    displayMap[name] = info.display;
+                    noteMap[name] = info.note;
+                    rangeMap[name] = info.range;
+                    (info.category === 'actual' ? actualValues : marketValues).push(midValue);
+
+                    details[name] = {
+                        title: `${name} 电能量价差`,
+                        totalVolume: info.display,
+                        marketVolumeDisplay: info.note || '暂无备注',
+                        tags: [info.category === 'actual' ? '实测数据' : '市场区间', info.range ? '提供范围' : '单点数据'],
+                        details: [
+                            { label: '价格/价差', value: info.display },
+                            ...(info.range ? [{ label: '范围数值', value: `${info.range[0]} ~ ${info.range[1]} 元/kWh` }] : []),
+                            info.note ? { label: '备注', value: info.note } : null
+                        ].filter(Boolean)
+                    };
+                });
+
+                const calcRange = (values) => {
+                    if (!values.length) return { min: 0, max: 1 };
+                    return { min: Math.min(...values), max: Math.max(...values) };
+                };
+
+                return {
+                    mapValues,
+                    details,
+                    categoryMap,
+                    displayMap,
+                    noteMap,
+                    rangeMap,
+                    ranges: {
+                        actual: calcRange(actualValues),
+                        market: calcRange(marketValues)
+                    }
+                };
+            };
+
+            const energyData = buildEnergyData();
+
             // --- 辅助数据 ---
-            const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省']; 
+            const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省'];
             const blueProvinces = ['贵州省', '云南省', '广西壮族自治区', '湖南省', '湖北省', '江西省', '内蒙古自治区'];
             const lightBlueProvinces = ['新疆维吾尔自治区', '黑龙江省', '吉林省', '辽宁省', '青海省'];
+
+            const energyColorScale = {
+                actual: ['#0f172a', '#1d4ed8', '#2563eb', '#60a5fa', '#93c5fd'],
+                market: ['#4c1d95', '#7c3aed', '#a855f7', '#c084fc', '#e9d5ff']
+            };
+
+            const getEnergyColor = (value, category) => {
+                const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
+                const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
+                const safeSpan = max - min || 1;
+                const ratio = Math.min(1, Math.max(0, (value - min) / safeSpan));
+                const idx = Math.min(palette.length - 1, Math.floor(ratio * (palette.length - 1)));
+                return palette[idx];
+            };
 
             // --- 数据选择逻辑 ---
             const currentData = marketType === 'frequency' ? frequencyData : energyData;
@@ -245,10 +331,24 @@
             const generateMapData = () => {
                 const data = [];
                 const values = currentData.mapValues || {};
-                Object.keys(values).forEach(name => data.push({ name: name, value: values[name] }));
-                
-                // 只有在调频市场时才显示这些特定的蓝梯队背景？或者电能量市场也用？
-                // 暂时假设只有调频市场有明确的梯队概念，电能量市场只显示有数据的省份
+
+                Object.keys(values).forEach(name => {
+                    if (marketType === 'energy') {
+                        const category = energyData.categoryMap[name];
+                        const color = getEnergyColor(values[name], category);
+                        data.push({
+                            name,
+                            value: values[name],
+                            itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
+                            emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
+                            energyCategory: category
+                        });
+                    } else {
+                        data.push({ name: name, value: values[name] });
+                    }
+                });
+
+                // 只有在调频市场时才显示这些特定的蓝梯队背景
                 if (marketType === 'frequency') {
                     deepBlueProvinces.forEach(name => !values[name] && data.push({ name, value: -3 }));
                     blueProvinces.forEach(name => !values[name] && data.push({ name, value: -2 }));
@@ -290,23 +390,15 @@
 
                     if (mode === 'china') {
                         // === 全国视图 ===
-                        // 根据市场类型动态设置 VisualMap 颜色
-                        const pieces = marketType === 'frequency' ? [
-                            { min: 4900, label: '5000万', color: currentPalette.map[0] }, 
-                            { min: 4050, max: 4899, label: '4100万', color: currentPalette.map[1] }, 
-                            { min: 3000, max: 4049, label: '4000万', color: currentPalette.map[2] }, 
-                            { min: 1000, max: 2999, label: '2500万', color: currentPalette.map[3] }, 
-                            { min: 0, max: 999, label: '500万', color: currentPalette.map[4] }, 
+                        const frequencyPieces = [
+                            { min: 4900, label: '5000万', color: currentPalette.map[0] },
+                            { min: 4050, max: 4899, label: '4100万', color: currentPalette.map[1] },
+                            { min: 3000, max: 4049, label: '4000万', color: currentPalette.map[2] },
+                            { min: 1000, max: 2999, label: '2500万', color: currentPalette.map[3] },
+                            { min: 0, max: 999, label: '500万', color: currentPalette.map[4] },
                             { value: -3, label: '第一梯队', color: '#1d4ed8' },
                             { value: -2, label: '第二梯队', color: '#60a5fa' },
                             { value: -1, label: '第三梯队', color: '#bfdbfe' }
-                        ] : [
-                            // 电能量市场的 VisualMap (示例蓝紫色系)
-                            { min: 8000, label: '特高', color: currentPalette.map[0] },
-                            { min: 6000, max: 7999, label: '高', color: currentPalette.map[1] },
-                            { min: 4000, max: 5999, label: '中', color: currentPalette.map[2] },
-                            { min: 2000, max: 3999, label: '低', color: currentPalette.map[3] },
-                            { min: 0, max: 1999, label: '很低', color: currentPalette.map[4] }
                         ];
 
                         option = {
@@ -319,19 +411,22 @@
                                 formatter: (params) => {
                                     if (params.seriesType === 'map') {
                                         if (!params.value) return `<div style="color:#94a3b8">${params.name} <br/>暂无数据</div>`;
-                                        let colorDot = `<span style="display:inline-block;margin-right:6px;border-radius:50%;width:8px;height:8px;background-color:${params.color};"></span>`;
+                                        let colorDot = `<span style="display:inline-block;margin-right:6px;border-radius:50%;width:8px;height:8px;background-color:${Array.isArray(params.color) ? params.color[params.color.length-1] : params.color};"></span>`;
                                         if (params.value > 0) {
                                             const info = currentData.details[params.name] || {};
-                                            const volume = info.totalVolume || params.value;
-                                            return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>
-                                                    <div style="font-size:12px; color:#475569; margin-bottom:6px;">${colorDot} 总量: <span style="font-weight:bold; color:${currentPalette.map[1]};">${volume}</span></div>
-                                                    <div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
+                                            const volume = marketType === 'energy' ? (energyData.displayMap[params.name] || info.totalVolume || params.value) : (info.totalVolume || params.value);
+                                            const note = marketType === 'energy' ? (energyData.noteMap[params.name] || info.marketVolumeDisplay || '') : (info.marketVolumeDisplay || '');
+                                            const categoryLabel = marketType === 'energy' ? (energyData.categoryMap[params.name] === 'actual' ? '实测数据' : '市场区间') : '市场总量';
+                                            return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                                    + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">${colorDot} ${categoryLabel}: <span style="font-weight:bold; color:${currentPalette.map[1]};">${volume}</span></div>`
+                                                    + (note ? `<div style="font-size:12px; color:#64748b; margin-bottom:4px;">${note}</div>` : '')
+                                                    + `<div style="font-size:12px; color:#0ea5e9; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 点击进入详情</div>`;
                                         }
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`;
                                     }
                                 }
                             },
-                            visualMap: { show: false, type: 'piecewise', pieces: pieces },
+                            ...(marketType === 'frequency' ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } } : {}),
                             geo: {
                                 map: 'china', roam: true, zoom: 1.2, center: [104.114129, 37.550339],
                                 label: { show: true, fontSize: 10, color: 'rgba(0,0,0,0.5)' },
