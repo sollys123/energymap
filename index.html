@@ -82,17 +82,17 @@
             const colorPalettes = {
                 frequency: {
                     // 红/橙/黄暖色系 (代表热度/收益)
-                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'], 
+                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'],
                     highlight: '#d97706',
                     iconBg: 'bg-red-50', iconText: 'text-red-600', iconBorder: 'border-red-100',
                     gradientFrom: 'from-red-600', gradientTo: 'to-orange-500'
                 },
                 energy: {
-                    // 蓝/紫冷色系 (代表电量/负荷)
-                    map: ['#1e1b4b', '#312e81', '#4338ca', '#6366f1', '#a5b4fc'], 
-                    highlight: '#4f46e5',
-                    iconBg: 'bg-indigo-50', iconText: 'text-indigo-600', iconBorder: 'border-indigo-100',
-                    gradientFrom: 'from-indigo-600', gradientTo: 'to-blue-500'
+                    // 蓝色系 (代表电量/负荷)
+                    map: ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'],
+                    highlight: '#38bdf8',
+                    iconBg: 'bg-sky-50', iconText: 'text-sky-600', iconBorder: 'border-sky-100',
+                    gradientFrom: 'from-sky-500', gradientTo: 'to-cyan-400'
                 }
             };
 
@@ -282,8 +282,8 @@
             const actualDataProvinces = ['河北省', '山西省', '江苏省', '浙江省', '河南省', '甘肃省', '宁夏回族自治区', '陕西省', '广东省'];
 
             const energyColorScale = {
-                actual: ['#064e3b', '#0f766e', '#14b8a6', '#2dd4bf', '#5eead4'],
-                market: ['#3b0764', '#6b21a8', '#9333ea', '#c084fc', '#e9d5ff']
+                actual: ['#fffbeb', '#fef3c7', '#fde68a', '#fbbf24', '#f59e0b'],
+                market: ['#f0f9ff', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9']
             };
 
             const getEnergyColor = (value, category) => {
@@ -645,7 +645,7 @@
                                             ) : (
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#064e3b] via-[#14b8a6] to-[#5eead4]"></div>
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#fef3c7] via-[#fde68a] to-[#f59e0b]"></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
                                                             <span>实测高</span>
                                                             <span>实测中高</span>
@@ -653,10 +653,10 @@
                                                             <span>实测中低</span>
                                                             <span>实测低</span>
                                                         </div>
-                                                        <span className="text-[11px] text-emerald-700 font-semibold px-2 py-1 bg-emerald-50 border border-emerald-100 rounded">实测省份</span>
+                                                        <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">实测省份</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#3b0764] via-[#9333ea] to-[#e9d5ff]"></div>
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f0f9ff] via-[#7dd3fc] to-[#0ea5e9]"></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
                                                             <span>市场高</span>
                                                             <span>市场中高</span>
@@ -664,7 +664,7 @@
                                                             <span>市场中低</span>
                                                             <span>市场低</span>
                                                         </div>
-                                                        <span className="text-[11px] text-purple-700 font-semibold px-2 py-1 bg-purple-50 border border-purple-100 rounded">市场区间省份</span>
+                                                        <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">市场区间省份</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
                                                         实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。
