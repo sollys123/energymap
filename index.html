@@ -351,14 +351,15 @@
                 market: ['#f0f9ff', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9']
             };
 
-            const formatPriceLabel = (value) => `${value.toFixed(3)} 元/kWh`;
+            const formatPriceLabel = (value) => {
+                if (!isFinite(value)) return '--';
+                return value >= 1 ? value.toFixed(1) : value.toFixed(2);
+            };
 
-            const buildScaleLabels = ({ min, max }, steps = 5) => {
+            const buildScaleLabels = ({ min, max }) => {
                 if (!isFinite(min) || !isFinite(max)) return [];
-                const span = max - min;
-                if (span === 0) return Array(steps).fill(max);
-                const step = span / (steps - 1);
-                return Array.from({ length: steps }, (_, idx) => max - idx * step);
+                if (min === max) return [max];
+                return [max, min];
             };
 
             const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
@@ -830,8 +831,8 @@
                                                         <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">市场区间省份</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。
-                                                        市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                        图例仅保留价差区间的最高/最低约值（不带单位），对应热力图滑块两端，方便快速比较。
+                                                        实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
                                                     </div>
                                                 </div>
                                             ) : (
