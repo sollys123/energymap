@@ -437,8 +437,12 @@
             const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
-            const policyColorScale = ['#eef2ff', '#93c5fd', '#2563eb'];
-            const spotProgressColorScale = ['#ffffff', '#e0f2ff', '#c7e0ff', '#9ec6ff', '#5a96f2', '#1d4ed8'];
+            const policyColorScale = {
+                long: ['#e0ebff', '#9ec5ff', '#3b82f6'], // 中长期政策：柔和蓝系
+                spot: ['#e0fbff', '#9beef3', '#06b6d4']  // 现货政策：青色系
+            };
+
+            const spotProgressColorScale = ['#ffffff', '#f3e8ff', '#e4d4ff', '#c7b8ff', '#a78bfa', '#7c3aed']; // 现货进程：紫色系
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
@@ -448,6 +452,8 @@
                 const idx = Math.min(palette.length - 1, Math.floor(ratio * (palette.length - 1)));
                 return palette[idx];
             };
+
+            const getPolicyPalette = () => energyView === 'policy-long' ? policyColorScale.long : policyColorScale.spot;
 
             // --- 数据选择逻辑 ---
             const currentData = useMemo(() => {
@@ -492,6 +498,7 @@
             // 生成热力图数据 (根据当前市场类型)
             const generateMapData = () => {
                 const data = [];
+                const policyPalette = getPolicyPalette();
                 const values = currentData.mapValues || {};
 
                 Object.keys(values).forEach(name => {
@@ -522,7 +529,7 @@
                             data.push({
                                 name,
                                 value: level,
-                                itemStyle: { areaColor: policyColorScale[level - 1] || policyColorScale[0], borderColor: '#fff', borderWidth: 1.2 },
+                                itemStyle: { areaColor: policyPalette[level - 1] || policyPalette[0], borderColor: '#fff', borderWidth: 1.2 },
                                 emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
                                 policyLevel: level
                             });
@@ -606,8 +613,9 @@
                                     if (params.data?.policyLevel) {
                                         const level = params.data.policyLevel;
                                         const levelInfo = policyLevelConfig[level] || policyLevelConfig[1];
+                                        const palette = getPolicyPalette();
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
-                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">政策等级：<span style="font-weight:bold; color:${policyColorScale[level - 1] || policyColorScale[0]};">${levelInfo.label}</span></div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">政策等级：<span style="font-weight:bold; color:${palette[level - 1] || palette[0]};">${levelInfo.label}</span></div>`
                                             + `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${levelInfo.desc}</div>`
                                             + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 点击进入详情</div>`;
                                     }
@@ -947,7 +955,12 @@
                                             ) : energyView === 'spot-progress' ? (
                                                 <div className="space-y-3 text-[11px] text-slate-700">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-32 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#1d4ed8] via-[#5a96f2] to-[#e0f2ff]"></div>
+                                                        <div
+                                                            className="h-32 w-3 rounded-full shadow-inner"
+                                                            style={{
+                                                                background: 'linear-gradient(to bottom, #7c3aed 0%, #a78bfa 30%, #c7b8ff 55%, #e4d4ff 78%, #f3e8ff 90%, #ffffff 100%)'
+                                                            }}
+                                                        ></div>
                                                         <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
                                                             {[5,4,3,2,1,0].map((level) => (
                                                                 <span key={`progress-${level}`}>{`${level}级`}</span>
@@ -961,19 +974,19 @@
                                             ) : (
                                                 <div className="space-y-3 text-[11px] text-slate-700">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded bg-[#eef2ff] border border-indigo-100"></div>
+                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[0], borderColor: '#dbeafe' }}></div>
                                                         <span>1级：无政策（最浅色）</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded bg-[#93c5fd] border border-indigo-200"></div>
+                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[1], borderColor: '#bfdbfe' }}></div>
                                                         <span>2级：经营主体包含储能（中间色）</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded bg-[#2563eb] border border-indigo-600"></div>
+                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[2], borderColor: '#93c5fd' }}></div>
                                                         <span className="text-indigo-700 font-semibold">3级：交易细则包含储能（最深色）</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        政策热力图在电能量板块中提供中长期与现货两张地图，可通过上方切换按钮选择。颜色从浅到深对应政策落地程度。
+                                                        政策热力图在电能量板块中提供中长期（蓝色系）与现货（青色系）两张地图，可通过上方切换按钮选择。颜色从浅到深对应政策落地程度。
                                                     </div>
                                                 </div>
                                             )}
