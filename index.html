@@ -438,7 +438,7 @@
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
             const policyColorScale = ['#eef2ff', '#93c5fd', '#2563eb'];
-            const spotProgressColorScale = ['#f8fafc', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#1d4ed8'];
+            const spotProgressColorScale = ['#ffffff', '#e0f2ff', '#c7e0ff', '#9ec6ff', '#5a96f2', '#1d4ed8'];
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
@@ -947,7 +947,7 @@
                                             ) : energyView === 'spot-progress' ? (
                                                 <div className="space-y-3 text-[11px] text-slate-700">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-32 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f8fafc] via-[#cbd5e1] to-[#1d4ed8]"></div>
+                                                        <div className="h-32 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#1d4ed8] via-[#5a96f2] to-[#e0f2ff]"></div>
                                                         <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
                                                             {[5,4,3,2,1,0].map((level) => (
                                                                 <span key={`progress-${level}`}>{`${level}级`}</span>
