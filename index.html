@@ -243,7 +243,7 @@
                     details[name] = {
                         title: `${name} 电能量价差`,
                         totalVolume: info.display,
-                        marketVolumeDisplay: info.note || '暂无备注',
+                        marketVolumeDisplay: info.note ? `${info.display} ｜ ${info.note}` : info.display,
                         tags: [info.category === 'actual' ? '实测数据' : '市场区间', info.range ? '提供范围' : '单点数据'],
                         details: [
                             { label: '价格/价差', value: info.display },
@@ -279,16 +279,18 @@
             const blueProvinces = ['贵州省', '云南省', '广西壮族自治区', '湖南省', '湖北省', '江西省', '内蒙古自治区'];
             const lightBlueProvinces = ['新疆维吾尔自治区', '黑龙江省', '吉林省', '辽宁省', '青海省'];
 
+            const actualDataProvinces = ['河北省', '山西省', '江苏省', '浙江省', '河南省', '甘肃省', '宁夏回族自治区', '陕西省', '广东省'];
+
             const energyColorScale = {
-                actual: ['#0f172a', '#1d4ed8', '#2563eb', '#60a5fa', '#93c5fd'],
-                market: ['#4c1d95', '#7c3aed', '#a855f7', '#c084fc', '#e9d5ff']
+                actual: ['#064e3b', '#0f766e', '#14b8a6', '#2dd4bf', '#5eead4'],
+                market: ['#3b0764', '#6b21a8', '#9333ea', '#c084fc', '#e9d5ff']
             };
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
                 const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
                 const safeSpan = max - min || 1;
-                const ratio = Math.min(1, Math.max(0, (value - min) / safeSpan));
+                const ratio = Math.min(1, Math.max(0, safeSpan === 0 ? 0.5 : (value - min) / safeSpan));
                 const idx = Math.min(palette.length - 1, Math.floor(ratio * (palette.length - 1)));
                 return palette[idx];
             };
@@ -607,18 +609,49 @@
                                     {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量规模 (热度)'}
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量价差热力图'}
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`h-32 w-2 rounded-full shadow-inner bg-gradient-to-b ${marketType === 'frequency' ? 'from-[#991b1b] via-[#ea580c] to-[#fef08a]' : 'from-[#1e1b4b] via-[#4338ca] to-[#a5b4fc]'}`}></div>
-                                                <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
-                                                    <span>高</span>
-                                                    <span>中高</span>
-                                                    <span>中</span>
-                                                    <span>中低</span>
-                                                    <span>低</span>
+                                            {marketType === 'frequency' ? (
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-32 w-2 rounded-full shadow-inner bg-gradient-to-b from-[#991b1b] via-[#ea580c] to-[#fef08a]"></div>
+                                                    <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
+                                                        <span>高</span>
+                                                        <span>中高</span>
+                                                        <span>中</span>
+                                                        <span>中低</span>
+                                                        <span>低</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#064e3b] via-[#14b8a6] to-[#5eead4]"></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>实测高</span>
+                                                            <span>实测中高</span>
+                                                            <span>实测中</span>
+                                                            <span>实测中低</span>
+                                                            <span>实测低</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-emerald-700 font-semibold px-2 py-1 bg-emerald-50 border border-emerald-100 rounded">实测省份</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#3b0764] via-[#9333ea] to-[#e9d5ff]"></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>市场高</span>
+                                                            <span>市场中高</span>
+                                                            <span>市场中</span>
+                                                            <span>市场中低</span>
+                                                            <span>市场低</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-purple-700 font-semibold px-2 py-1 bg-purple-50 border border-purple-100 rounded">市场区间省份</span>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                                                        实测省份（取单点值绘制）：{actualDataProvinces.join('、')}。
+                                                        市场区间省份按给定范围取中值绘制，点击可查看原始区间与备注。
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
