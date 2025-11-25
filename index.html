@@ -1,37 +1,37 @@
 <!DOCTYPE html>
-<html   超文本标记语言    < html   超文本标记语言 lang   朗 = "应用" >lang="zh-CN">
-<head   头>
-    <meta   元 charset   字符集="UTF-8"   “utf - 8”>
-    <meta   元 name   名字="viewport"   “视口” content   内容="width=device-width, initial-scale=1.0"“宽度=设备宽度,初始= 1.0”>
-    <title   标题>电力市场综合热力图</title   标题>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电力市场综合热力图</title>
     
     <!-- 1. Tailwind CSS -->
-    < script   脚本 src = " https://cdn.tailwindcss.com " > < /脚本><script src="https://cdn.tailwindcss.com   和"></script   脚本>
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- 2. React 全家桶 (Staticfile CDN) -->
-    <script    脚本crossorigin src="https://cdn.staticfile.net/react/18.2.0/umd/react.production.min.js"></script   脚本>
-    <script    脚本crossorigin src="https://cdn.staticfile.net/react-dom/18.2.0/umd/react-dom.production.min.js"></script   脚本>
+    <script crossorigin src="https://cdn.staticfile.net/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdn.staticfile.net/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     
-    <!-- 3. Babel   巴别塔 (Staticfile CDN) -->
-    <script    脚本src="https://cdn.staticfile.net/babel-standalone/7.22.20/babel.min.js"></script   脚本>
+    <!-- 3. Babel (Staticfile CDN) -->
+    <script src="https://cdn.staticfile.net/babel-standalone/7.22.20/babel.min.js"></script>
     
     <!-- 4. ECharts (Staticfile CDN) -->
-    <script    脚本src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script   脚本>
+    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
 
-       < >风格<style   风格>
-        ::-webkit-scrollbar   滚动条 { width   宽度: 6px; height   高度: 6px; }
-        ::-webkit-scrollbar   滚动条-track   跟踪 { background   背景: #f1f5f9; }
-        ::-webkit-scrollbar   滚动条-thumb   拇指 { background   背景: #cbd5e1; border   边境-radius   半径: 3px; }
-        ::-webkit-scrollbar   滚动条-thumb   拇指:hover { background   背景: #94a3b8; }
-        .fade-in   在 { animation   动画: fadeIn 0.5s   年代 ease   缓解-in-out; }
-        @keyframes   关键帧 fadeIn { from    从{ opacity   不透明度: 0; } to { opacity   不透明度: 1; } }
-       > < /风格</style   风格>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
 </head>
-<body    身体class   类="bg-slate-50">
+<body class="bg-slate-50">
     <div id="root"></div>
 
-    <script    脚本type   类型="text/babel">
-        const   常量 { useState, useEffect, useRef, useMemo } = React   反应;
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
 
         // --- 图标组件 ---
         const IconWrapper = ({ children, size = 24, className = "" }) => (
