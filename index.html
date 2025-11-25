@@ -771,6 +771,7 @@
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                 {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : '电能量政策热力图')}
+                                                {marketType === 'frequency' ? '调频收益 (热度)' : '电能量价差热力图'}
                                             </div>
                                             {marketType === 'frequency' ? (
                                                 <div className="flex items-center gap-3">
@@ -784,6 +785,7 @@
                                                     </div>
                                                 </div>
                                             ) : energyView === 'price' ? (
+                                            ) : (
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#fef3c7] via-[#fde68a] to-[#f59e0b]"></div>
