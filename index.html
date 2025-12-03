@@ -79,14 +79,16 @@
 
             // --- 配置定义 ---
             
+            const brandBlueScale = ['#001A72', '#0038B8', '#0057F1', '#1FAEFF', '#66D4FF', '#A8ECFF', '#E5F9FF'];
+
             // 1. 颜色配置 (根据市场类型切换)
             const colorPalettes = {
                 frequency: {
-                    // 红/橙/黄暖色系 (代表热度/收益)
-                    map: ['#991b1b', '#dc2626', '#ea580c', '#fbbf24', '#fef08a'],
-                    highlight: '#d97706',
-                    iconBg: 'bg-red-50', iconText: 'text-red-600', iconBorder: 'border-red-100',
-                    gradientFrom: 'from-red-600', gradientTo: 'to-orange-500'
+                    // 品牌蓝色系 (代表热度/收益)
+                    map: brandBlueScale.slice(0, 5),
+                    highlight: '#0057F1',
+                    iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
+                    gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
                 },
                 energy: {
                     // 中性灰阶 (代表电量/负荷)
@@ -105,7 +107,7 @@
                 'F': { color: '#7e22ce', symbol: 'rect', label: '火电/煤电', beltColor: '#d8b4fe' },
                 'S': { color: '#0ea5e9', symbol: 'triangle', label: '调节/水电/核电', beltColor: '#7dd3fc' },
                 // 电能量市场可能用到的新类型 (预留)
-                'L': { color: '#f59e0b', symbol: 'diamond', label: '负荷中心', beltColor: '#fcd34d' } 
+                'L': { color: '#0057F1', symbol: 'diamond', label: '负荷中心', beltColor: '#A8ECFF' }
             };
 
             // --- 数据源 ---
@@ -308,7 +310,7 @@
             const spotProgressColorScale = ['#ffffff', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#52525b']; // 现货进程：灰色系
 
             const spotResearchColorScale = {
-                researched: ['#fff7ed', '#ffedd5', '#fed7aa', '#fdba74', '#fb923c', '#ea580c'],
+                researched: ['#E5F9FF', '#A8ECFF', '#66D4FF', '#1FAEFF', '#0057F1', '#0038B8'],
                 unresearched: spotProgressColorScale
             };
 
@@ -477,7 +479,7 @@
             const actualDataProvinces = ['河北省', '山西省', '江苏省', '浙江省', '河南省', '甘肃省', '宁夏回族自治区', '陕西省', '广东省'];
 
             const energyColorScale = {
-                actual: ['#fffbeb', '#fef3c7', '#fde68a', '#fbbf24', '#f59e0b'],
+                actual: ['#E5F9FF', '#A8ECFF', '#66D4FF', '#1FAEFF', '#0057F1'],
                 market: ['#f9fafb', '#e5e7eb', '#d1d5db', '#9ca3af', '#6b7280']
             };
 
@@ -663,7 +665,7 @@
                                         const longPolicyLabel = params.data.longPolicyLabel || (longPolicy ? policyLevelConfig[longPolicy]?.label : '');
                                         const spotPolicyLabel = params.data.spotPolicyLabel || (spotPolicy ? policyLevelConfig[spotPolicy]?.label : '');
                                         const researchLabel = researchStatus ? spotResearchLabelMap[researchStatus] : '未调研（默认灰色系）';
-                                        const researchColor = researchStatus?.startsWith('researched') ? '#ea580c' : '#52525b';
+                                        const researchColor = researchStatus?.startsWith('researched') ? '#0057F1' : '#52525b';
                                         const policyLines = [
                                             longPolicyLabel ? `<div style="font-size:12px; color:#334155;">中长期政策：${longPolicyLabel}</div>` : '',
                                             spotPolicyLabel ? `<div style="font-size:12px; color:#475569;">现货政策：${spotPolicyLabel}</div>` : '',
@@ -910,7 +912,7 @@
                                     <div className="p-1 bg-slate-100 rounded-lg flex gap-1">
                                         <button
                                             onClick={() => setMarketType('frequency')}
-                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             <Activity size={14} /> 二次调频
                                         </button>
@@ -956,7 +958,7 @@
                                             </div>
                                             {marketType === 'frequency' ? (
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-32 w-2 rounded-full shadow-inner bg-gradient-to-b from-[#991b1b] via-[#ea580c] to-[#fef08a]"></div>
+                                                    <div className="h-32 w-2 rounded-full shadow-inner bg-gradient-to-b from-[#001A72] via-[#0057F1] to-[#66D4FF]"></div>
                                                     <div className="flex flex-col justify-between h-32 text-xs text-slate-600 font-medium">
                                                         <span>高</span>
                                                         <span>中高</span>
@@ -968,13 +970,13 @@
                                             ) : energyView === 'price' ? (
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#fef3c7] via-[#fde68a] to-[#f59e0b]"></div>
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#E5F9FF] via-[#A8ECFF] to-[#1FAEFF]"></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
                                                             {actualScaleLabels.map((label, idx) => (
                                                                 <span key={`actual-scale-${idx}`}>{formatPriceLabel(label)}</span>
                                                             ))}
                                                         </div>
-                                                        <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">实测省份</span>
+                                                        <span className="text-[11px] text-blue-700 font-semibold px-2 py-1 bg-blue-50 border border-blue-100 rounded">实测省份</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f9fafb] via-[#d1d5db] to-[#6b7280]"></div>
@@ -994,16 +996,16 @@
                                                     <div className="space-y-2">
                                                         <div className="flex items-center gap-3">
                                                             <div
-                                                                className="h-24 w-3 rounded-full shadow-inner"
-                                                                style={{
-                                                                    background: 'linear-gradient(to bottom, #ea580c 0%, #fb923c 30%, #fdba74 55%, #fed7aa 78%, #ffedd5 90%, #fff7ed 100%)'
+                                                            className="h-24 w-3 rounded-full shadow-inner"
+                                                            style={{
+                                                                    background: 'linear-gradient(to bottom, #0038B8 0%, #0057F1 30%, #1FAEFF 55%, #66D4FF 78%, #A8ECFF 90%, #E5F9FF 100%)'
                                                                 }}
                                                             ></div>
                                                             <div className="flex flex-col justify-between h-24 text-[11px] text-slate-700 font-semibold">
                                                                 <span>成熟度高</span>
                                                                 <span>暂无现货进展</span>
                                                             </div>
-                                                            <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">已调研储能省份</span>
+                                                            <span className="text-[11px] text-blue-700 font-semibold px-2 py-1 bg-blue-50 border border-blue-100 rounded">已调研储能省份</span>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                         <div
@@ -1030,7 +1032,7 @@
                                                         ))}
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        黄色系表示已调研、储能已参与或即将参与现货的省份，灰色系表示未调研或暂未对储能开放；颜色越深代表成熟度越高，点击或悬停可查看进展说明与政策信息。
+                                                        蓝色系表示已调研、储能已参与或即将参与现货的省份，灰色系表示未调研或暂未对储能开放；颜色越深代表成熟度越高，点击或悬停可查看进展说明与政策信息。
                                                     </div>
                                                 </div>
                                             )}
@@ -1110,7 +1112,7 @@
                                         <div>
                                             <div className="flex items-center gap-2 mb-1"><h2 className="text-2xl font-bold text-slate-800">{selectedProvinceInfo.title}</h2></div>
                                             <div className="flex flex-wrap gap-2 mt-2">
-                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
+                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
                                                 {selectedProvinceInfo.tags && selectedProvinceInfo.tags.map((tag, i) => <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">{tag}</span>)}
                                             </div>
                                         </div>
@@ -1118,9 +1120,9 @@
                                     </div>
                                     <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
                                         {/* 动态卡片颜色 */}
-                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-red-100 shadow-red-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
-                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-red-50' : 'from-indigo-50'}`}></div>}
-                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-red-600' : 'text-indigo-600'}`}>
+                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
+                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : 'from-indigo-50'}`}></div>}
+                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-blue-700' : 'text-indigo-600'}`}>
                                                 {marketType === 'frequency' ? <Coins size={20} /> : <Zap size={20} />}
                                                 <span>{detailSummaryTitle}</span>
                                             </div>
