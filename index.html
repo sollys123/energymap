@@ -282,6 +282,15 @@
                 3: { label: '交易细则包含储能', desc: '交易细则明确覆盖储能' }
             };
 
+            const spotProgressLevelText = {
+                0: '暂无现货市场进展或表格未给出信息',
+                1: '模拟/调电试运行',
+                2: '短周期结算试运行',
+                3: '长周期结算试运行',
+                4: '连续结算试运行',
+                5: '正式运行'
+            };
+
             const provinceAlias = {
                 '北京': '北京市', '天津': '天津市', '河北南网': '河北省', '冀北': '河北省',
                 '山东': '山东省', '山西': '山西省', '安徽': '安徽省', '福建': '福建省',
@@ -313,7 +322,6 @@
                         tags: [title, levelInfo.label],
                         heatValue: level,
                         details: [
-                            { label: '编码', value: level },
                             { label: '政策等级', value: levelInfo.label },
                             { label: '说明', value: levelInfo.desc }
                         ]
@@ -337,6 +345,9 @@
 
                     const longPolicyLevel = longPolicyData?.mapValues?.[name];
                     const spotPolicyLevel = spotPolicyData?.mapValues?.[name];
+                    const levelLabel = spotProgressLevelText[finalLevel] || spotProgressLevelText[0];
+                    const longPolicyLabel = longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null;
+                    const spotPolicyLabel = spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null;
 
                     if (adcodeMap[name]) {
                         mapValues[name] = finalLevel;
@@ -346,21 +357,21 @@
                     policyMap[name] = { long: longPolicyLevel, spot: spotPolicyLevel };
                     details[name] = {
                         title: `${name} 现货市场进程`,
-                        totalVolume: `成熟度等级：${finalLevel}级`,
+                        totalVolume: `成熟度：${levelLabel}`,
                         marketVolumeDisplay: remark || '暂无备注信息',
                         tags: [
                             '现货市场进程',
-                            `${finalLevel}级`,
-                            longPolicyLevel ? `中长期政策${longPolicyLevel}级` : null,
-                            spotPolicyLevel ? `现货政策${spotPolicyLevel}级` : null
+                            levelLabel,
+                            longPolicyLabel ? `中长期政策：${longPolicyLabel}` : null,
+                            spotPolicyLabel ? `现货政策：${spotPolicyLabel}` : null
                         ].filter(Boolean),
                         heatValue: finalLevel,
                         remark,
                         details: [
-                            { label: '成熟度等级', value: `${finalLevel}级` },
+                            { label: '成熟度', value: levelLabel },
                             remark ? { label: '进展说明', value: remark } : null,
-                            longPolicyLevel ? { label: '中长期政策等级', value: `${longPolicyLevel}级` } : null,
-                            spotPolicyLevel ? { label: '现货政策等级', value: `${spotPolicyLevel}级` } : null
+                            longPolicyLabel ? { label: '中长期政策', value: longPolicyLabel } : null,
+                            spotPolicyLabel ? { label: '现货政策', value: spotPolicyLabel } : null
                         ].filter(Boolean)
                     };
                 });
@@ -602,12 +613,15 @@
                                         const color = spotProgressColorScale[level] || spotProgressColorScale[0];
                                         const longPolicy = params.data.longPolicyLevel;
                                         const spotPolicy = params.data.spotPolicyLevel;
+                                        const levelLabel = spotProgressLevelText[level] || spotProgressLevelText[0];
+                                        const longPolicyLabel = longPolicy ? policyLevelConfig[longPolicy]?.label : '';
+                                        const spotPolicyLabel = spotPolicy ? policyLevelConfig[spotPolicy]?.label : '';
                                         const policyLines = [
-                                            longPolicy ? `<div style="font-size:12px; color:#1d4ed8;">中长期政策：${longPolicy}级</div>` : '',
-                                            spotPolicy ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicy}级</div>` : ''
+                                            longPolicyLabel ? `<div style="font-size:12px; color:#1d4ed8;">中长期政策：${longPolicyLabel}</div>` : '',
+                                            spotPolicyLabel ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicyLabel}</div>` : ''
                                         ].join('');
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
-                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度等级：<span style="font-weight:bold; color:${color};">${level}级</span></div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度：<span style="font-weight:bold; color:${color};">${levelLabel}</span></div>`
                                             + policyLines
                                             + (remark ? `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${remark}</div>` : '')
                                             + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
@@ -937,12 +951,12 @@
                                                         ></div>
                                                         <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
                                                             {[5,4,3,2,1,0].map((level) => (
-                                                                <span key={`progress-${level}`}>{`${level}级`}</span>
+                                                                <span key={`progress-${level}`}>{spotProgressLevelText[level] || spotProgressLevelText[0]}</span>
                                                             ))}
                                                         </div>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        0-5级逐级加深，0 为暂无信息，5 为正式运行；悬停或点击可查看备注与政策等级。
+                                                        颜色从浅到深对应“正式运行 → 连续结算试运行 → 长周期结算试运行 → 短周期结算试运行 → 模拟/调电试运行 → 暂无现货市场进展或表格未给出信息”；悬停或点击可查看备注与政策说明。
                                                     </div>
                                                 </div>
                                             )}
