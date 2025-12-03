@@ -308,6 +308,7 @@
             const buildPolicyData = (entries, title) => {
                 const mapValues = {};
                 const details = {};
+                const labelMap = {};
 
                 entries.forEach(([rawName, value]) => {
                     const name = normalizeProvince(rawName);
@@ -315,20 +316,21 @@
                     mapValues[name] = level;
 
                     const levelInfo = policyLevelConfig[level] || policyLevelConfig[1];
+                    labelMap[name] = levelInfo.label;
                     details[name] = {
                         title: `${name} ${title}`,
-                        totalVolume: `政策等级：${levelInfo.label}`,
+                        totalVolume: `政策：${levelInfo.label}`,
                         marketVolumeDisplay: levelInfo.desc,
                         tags: [title, levelInfo.label],
                         heatValue: level,
                         details: [
-                            { label: '政策等级', value: levelInfo.label },
+                            { label: '政策', value: levelInfo.label },
                             { label: '说明', value: levelInfo.desc }
                         ]
                     };
                 });
 
-                return { mapValues, details };
+                return { mapValues, details, labelMap };
             };
 
             const buildSpotProgressData = (entries, longPolicyData, spotPolicyData) => {
@@ -336,6 +338,8 @@
                 const details = {};
                 const remarkMap = {};
                 const policyMap = {};
+                const levelLabelMap = {};
+                const policyLabelMap = {};
 
                 entries.forEach(([rawName, rawLevel, remark]) => {
                     const name = normalizeProvince(rawName);
@@ -346,8 +350,8 @@
                     const longPolicyLevel = longPolicyData?.mapValues?.[name];
                     const spotPolicyLevel = spotPolicyData?.mapValues?.[name];
                     const levelLabel = spotProgressLevelText[finalLevel] || spotProgressLevelText[0];
-                    const longPolicyLabel = longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null;
-                    const spotPolicyLabel = spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null;
+                    const longPolicyLabel = longPolicyData?.labelMap?.[name] || (longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null);
+                    const spotPolicyLabel = spotPolicyData?.labelMap?.[name] || (spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null);
 
                     if (adcodeMap[name]) {
                         mapValues[name] = finalLevel;
@@ -355,6 +359,8 @@
 
                     remarkMap[name] = remark;
                     policyMap[name] = { long: longPolicyLevel, spot: spotPolicyLevel };
+                    levelLabelMap[name] = levelLabel;
+                    policyLabelMap[name] = { long: longPolicyLabel, spot: spotPolicyLabel };
                     details[name] = {
                         title: `${name} 现货市场进程`,
                         totalVolume: `成熟度：${levelLabel}`,
@@ -376,7 +382,7 @@
                     };
                 });
 
-                return { mapValues, details, remarkMap, policyMap };
+                return { mapValues, details, remarkMap, policyMap, levelLabelMap, policyLabelMap };
             };
 
             const longTermPolicyData = buildPolicyData([
@@ -530,15 +536,20 @@
                             const level = values[name] ?? 0;
                             const remark = currentData.remarkMap?.[name];
                             const policyInfo = currentData.policyMap?.[name];
+                            const levelLabel = currentData.levelLabelMap?.[name] || spotProgressLevelText[level] || spotProgressLevelText[0];
+                            const policyLabels = currentData.policyLabelMap?.[name] || {};
                             data.push({
                                 name,
                                 value: level,
                                 itemStyle: { areaColor: spotProgressColorScale[level] || spotProgressColorScale[0], borderColor: '#fff', borderWidth: 1.2 },
                                 emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
                                 spotProgressLevel: level,
+                                spotProgressLabel: levelLabel,
                                 remark,
                                 longPolicyLevel: policyInfo?.long,
-                                spotPolicyLevel: policyInfo?.spot
+                                spotPolicyLevel: policyInfo?.spot,
+                                longPolicyLabel: policyLabels.long,
+                                spotPolicyLabel: policyLabels.spot
                             });
                         }
                     } else {
@@ -613,9 +624,9 @@
                                         const color = spotProgressColorScale[level] || spotProgressColorScale[0];
                                         const longPolicy = params.data.longPolicyLevel;
                                         const spotPolicy = params.data.spotPolicyLevel;
-                                        const levelLabel = spotProgressLevelText[level] || spotProgressLevelText[0];
-                                        const longPolicyLabel = longPolicy ? policyLevelConfig[longPolicy]?.label : '';
-                                        const spotPolicyLabel = spotPolicy ? policyLevelConfig[spotPolicy]?.label : '';
+                                        const levelLabel = params.data.spotProgressLabel || spotProgressLevelText[level] || spotProgressLevelText[0];
+                                        const longPolicyLabel = params.data.longPolicyLabel || (longPolicy ? policyLevelConfig[longPolicy]?.label : '');
+                                        const spotPolicyLabel = params.data.spotPolicyLabel || (spotPolicy ? policyLevelConfig[spotPolicy]?.label : '');
                                         const policyLines = [
                                             longPolicyLabel ? `<div style="font-size:12px; color:#1d4ed8;">中长期政策：${longPolicyLabel}</div>` : '',
                                             spotPolicyLabel ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicyLabel}</div>` : ''
@@ -949,14 +960,23 @@
                                                                 background: 'linear-gradient(to bottom, #1d4ed8 0%, #4f8df9 30%, #8abaff 55%, #b7d7ff 78%, #e0f2ff 90%, #ffffff 100%)'
                                                             }}
                                                         ></div>
-                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
-                                                            {[5,4,3,2,1,0].map((level) => (
-                                                                <span key={`progress-${level}`}>{spotProgressLevelText[level] || spotProgressLevelText[0]}</span>
-                                                            ))}
+                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-700 font-semibold">
+                                                            <span>成熟度高</span>
+                                                            <span>暂无现货进展</span>
                                                         </div>
                                                     </div>
+                                                    <div className="grid grid-cols-1 gap-1.5">
+                                                        {[5,4,3,2,1,0].map((level) => (
+                                                            <span
+                                                                key={`progress-${level}`}
+                                                                className="px-2 py-1 rounded-full bg-slate-50 border border-slate-100 text-slate-700 text-[11px]"
+                                                            >
+                                                                {spotProgressLevelText[level] || spotProgressLevelText[0]}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        颜色从浅到深对应“正式运行 → 连续结算试运行 → 长周期结算试运行 → 短周期结算试运行 → 模拟/调电试运行 → 暂无现货市场进展或表格未给出信息”；悬停或点击可查看备注与政策说明。
+                                                        蓝色越深代表现货市场成熟度越高，点击或悬停可查看各省的进展说明与政策信息。
                                                     </div>
                                                 </div>
                                             )}
