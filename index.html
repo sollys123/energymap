@@ -372,6 +372,12 @@
                     const longPolicyLabel = longPolicyData?.labelMap?.[name] || (longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null);
                     const spotPolicyLabel = spotPolicyData?.labelMap?.[name] || (spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null);
 
+                    const longPolicyLevel = longPolicyData?.mapValues?.[name];
+                    const spotPolicyLevel = spotPolicyData?.mapValues?.[name];
+                    const levelLabel = spotProgressLevelText[finalLevel] || spotProgressLevelText[0];
+                    const longPolicyLabel = longPolicyData?.labelMap?.[name] || (longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null);
+                    const spotPolicyLabel = spotPolicyData?.labelMap?.[name] || (spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null);
+
                     if (adcodeMap[name]) {
                         mapValues[name] = finalLevel;
                     }
