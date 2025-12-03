@@ -79,23 +79,23 @@
 
             // --- 配置定义 ---
             
-            const brandBlueScale = ['#001A72', '#0038B8', '#0057F1', '#1FAEFF', '#66D4FF', '#A8ECFF', '#E5F9FF'];
+            const brandBlueScale = ['#E5F9FF', '#A8ECFF', '#66D4FF', '#1FAEFF', '#0057F1', '#0038B8', '#001A72'];
 
             // 1. 颜色配置 (根据市场类型切换)
             const colorPalettes = {
                 frequency: {
                     // 品牌蓝色系 (代表热度/收益)
-                    map: brandBlueScale.slice(0, 5),
-                    highlight: '#0057F1',
+                    map: [brandBlueScale[6], brandBlueScale[5], brandBlueScale[4], brandBlueScale[3], brandBlueScale[2]],
+                    highlight: brandBlueScale[5],
                     iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
                     gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
                 },
                 energy: {
-                    // 中性灰阶 (代表电量/负荷)
-                    map: ['#111827', '#374151', '#6b7280', '#d1d5db', '#f3f4f6'],
-                    highlight: '#6b7280',
-                    iconBg: 'bg-slate-50', iconText: 'text-slate-600', iconBorder: 'border-slate-200',
-                    gradientFrom: 'from-slate-600', gradientTo: 'to-gray-400'
+                    // 与其他视图保持统一的蓝色系
+                    map: [brandBlueScale[2], brandBlueScale[3], brandBlueScale[4], brandBlueScale[5], brandBlueScale[6]],
+                    highlight: brandBlueScale[5],
+                    iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
+                    gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
                 }
             };
 
@@ -307,10 +307,10 @@
 
             const normalizeProvince = (name) => provinceAlias[name] || name;
 
-            const spotProgressColorScale = ['#ffffff', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#52525b']; // 现货进程：灰色系
+            const spotProgressColorScale = ['#f8fafc', '#e2e8f0', '#cbd5e1', '#94a3b8', '#475569', '#1f2937']; // 现货进程：灰色系
 
             const spotResearchColorScale = {
-                researched: ['#E5F9FF', '#A8ECFF', '#66D4FF', '#1FAEFF', '#0057F1', '#0038B8'],
+                researched: [brandBlueScale[0], brandBlueScale[1], brandBlueScale[2], brandBlueScale[3], brandBlueScale[5], brandBlueScale[6]],
                 unresearched: spotProgressColorScale
             };
 
@@ -479,8 +479,8 @@
             const actualDataProvinces = ['河北省', '山西省', '江苏省', '浙江省', '河南省', '甘肃省', '宁夏回族自治区', '陕西省', '广东省'];
 
             const energyColorScale = {
-                actual: ['#E5F9FF', '#A8ECFF', '#66D4FF', '#1FAEFF', '#0057F1'],
-                market: ['#f9fafb', '#e5e7eb', '#d1d5db', '#9ca3af', '#6b7280']
+                actual: [...brandBlueScale],
+                market: ['#f8fafc', '#e2e8f0', '#cbd5e1', '#94a3b8', '#475569', '#1f2937']
             };
 
             const formatPriceLabel = (value) => {
@@ -665,7 +665,7 @@
                                         const longPolicyLabel = params.data.longPolicyLabel || (longPolicy ? policyLevelConfig[longPolicy]?.label : '');
                                         const spotPolicyLabel = params.data.spotPolicyLabel || (spotPolicy ? policyLevelConfig[spotPolicy]?.label : '');
                                         const researchLabel = researchStatus ? spotResearchLabelMap[researchStatus] : '未调研（默认灰色系）';
-                                        const researchColor = researchStatus?.startsWith('researched') ? '#0057F1' : '#52525b';
+                                        const researchColor = researchStatus?.startsWith('researched') ? '#0038B8' : '#1f2937';
                                         const policyLines = [
                                             longPolicyLabel ? `<div style="font-size:12px; color:#334155;">中长期政策：${longPolicyLabel}</div>` : '',
                                             spotPolicyLabel ? `<div style="font-size:12px; color:#475569;">现货政策：${spotPolicyLabel}</div>` : '',
@@ -970,7 +970,12 @@
                                             ) : energyView === 'price' ? (
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#E5F9FF] via-[#A8ECFF] to-[#1FAEFF]"></div>
+                                                        <div
+                                                            className="h-24 w-3 rounded-full shadow-inner"
+                                                            style={{
+                                                                background: 'linear-gradient(to bottom, #001A72 0%, #0038B8 28%, #0057F1 52%, #1FAEFF 76%, #66D4FF 100%)'
+                                                            }}
+                                                        ></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
                                                             {actualScaleLabels.map((label, idx) => (
                                                                 <span key={`actual-scale-${idx}`}>{formatPriceLabel(label)}</span>
@@ -979,7 +984,12 @@
                                                         <span className="text-[11px] text-blue-700 font-semibold px-2 py-1 bg-blue-50 border border-blue-100 rounded">实测省份</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-[#f9fafb] via-[#d1d5db] to-[#6b7280]"></div>
+                                                        <div
+                                                            className="h-24 w-3 rounded-full shadow-inner"
+                                                            style={{
+                                                                background: 'linear-gradient(to bottom, #1f2937 0%, #475569 35%, #94a3b8 65%, #cbd5e1 85%, #f8fafc 100%)'
+                                                            }}
+                                                        ></div>
                                                         <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
                                                             {marketScaleLabels.map((label, idx) => (
                                                                 <span key={`market-scale-${idx}`}>{formatPriceLabel(label)}</span>
@@ -998,27 +1008,27 @@
                                                             <div
                                                             className="h-24 w-3 rounded-full shadow-inner"
                                                             style={{
-                                                                    background: 'linear-gradient(to bottom, #0038B8 0%, #0057F1 30%, #1FAEFF 55%, #66D4FF 78%, #A8ECFF 90%, #E5F9FF 100%)'
+                                                                    background: 'linear-gradient(to bottom, #001A72 0%, #0038B8 24%, #0057F1 48%, #1FAEFF 72%, #66D4FF 90%, #A8ECFF 100%)'
                                                                 }}
                                                             ></div>
                                                             <div className="flex flex-col justify-between h-24 text-[11px] text-slate-700 font-semibold">
                                                                 <span>成熟度高</span>
                                                                 <span>暂无现货进展</span>
                                                             </div>
-                                                            <span className="text-[11px] text-blue-700 font-semibold px-2 py-1 bg-blue-50 border border-blue-100 rounded">已调研储能省份</span>
+                                                            <span className="text-[11px] text-indigo-800 font-semibold px-2 py-1 bg-blue-50 border border-blue-100 rounded">已调研储能省份</span>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                         <div
                                                                 className="h-24 w-3 rounded-full shadow-inner"
                                                                 style={{
-                                                                    background: 'linear-gradient(to bottom, #52525b 0%, #a1a1aa 30%, #d4d4d8 55%, #e4e4e7 78%, #f4f4f5 90%, #ffffff 100%)'
+                                                                    background: 'linear-gradient(to bottom, #1f2937 0%, #475569 30%, #94a3b8 60%, #cbd5e1 82%, #e2e8f0 92%, #f8fafc 100%)'
                                                                 }}
                                                             ></div>
                                                             <div className="flex flex-col justify-between h-24 text-[11px] text-slate-700 font-semibold">
                                                                 <span>成熟度高</span>
                                                                 <span>暂无现货进展</span>
                                                             </div>
-                                                            <span className="text-[11px] text-slate-700 font-semibold px-2 py-1 bg-slate-50 border border-slate-200 rounded">未调研 / 暂未开放</span>
+                                                            <span className="text-[11px] text-slate-800 font-semibold px-2 py-1 bg-slate-50 border border-slate-200 rounded">未调研 / 暂未开放</span>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 gap-1.5">
