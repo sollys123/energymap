@@ -80,20 +80,21 @@
             // --- 配置定义 ---
             
             const brandBlueScale = ['#E5F4FF', '#BFE2FF', '#8CC7FF', '#53A8FF', '#2B86F6', '#1B64D8', '#0E46A5'];
+            const hoverHighlightColor = '#facc15';
 
             // 1. 颜色配置 (根据市场类型切换)
             const colorPalettes = {
                 frequency: {
                     // 品牌蓝色系 (代表热度/收益)
                     map: [brandBlueScale[6], brandBlueScale[5], brandBlueScale[4], brandBlueScale[3], brandBlueScale[2]],
-                    highlight: brandBlueScale[5],
+                    highlight: hoverHighlightColor,
                     iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
                     gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
                 },
                 energy: {
                     // 与其他视图保持统一的蓝色系
                     map: [brandBlueScale[2], brandBlueScale[3], brandBlueScale[4], brandBlueScale[5], brandBlueScale[6]],
-                    highlight: brandBlueScale[5],
+                    highlight: hoverHighlightColor,
                     iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
                     gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
                 }
@@ -730,7 +731,7 @@
                                 center: [104.114129, 37.550339],
                                 label: { show: true, fontSize: 10, color: 'rgba(0,0,0,0.5)' },
                                 itemStyle: { areaColor: '#f8fafc', borderColor: '#cbd5e1', borderWidth: 1 },
-                                emphasis: { label: { show: true, color: '#fff' }, itemStyle: { areaColor: currentPalette.highlight } },
+                                emphasis: { label: { show: true, color: '#854d0e' }, itemStyle: { areaColor: currentPalette.highlight } },
                                 data: generateMapData(),
                                 selectedMode: false
                             }]
@@ -761,7 +762,7 @@
                                 map: mapName, roam: true, zoom: 1.0,
                                 label: { show: true, color: '#64748b' },
                                 itemStyle: { areaColor: '#e2e8f0', borderColor: '#94a3b8', borderWidth: 1.5, shadowColor: 'rgba(0, 0, 0, 0.2)', shadowBlur: 10 },
-                                emphasis: { itemStyle: { areaColor: '#cbd5e1' }, label: { color: '#0f172a' } }
+                                emphasis: { itemStyle: { areaColor: hoverHighlightColor }, label: { color: '#854d0e' } }
                             },
                             series: [
                                 {
