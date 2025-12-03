@@ -56,7 +56,7 @@
             
             // --- 核心状态 ---
             const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
-            const [energyView, setEnergyView] = useState('price'); // 'price' | 'policy-long' | 'policy-spot' | 'spot-progress'
+            const [energyView, setEnergyView] = useState('price'); // 'price' | 'spot-progress'
             const [viewMode, setViewMode] = useState('china'); // 'china' | 'province'
             const [currentProvince, setCurrentProvince] = useState(null);
             const [selectedProvinceInfo, setSelectedProvinceInfo] = useState(null);
@@ -282,6 +282,15 @@
                 3: { label: '交易细则包含储能', desc: '交易细则明确覆盖储能' }
             };
 
+            const spotProgressLevelText = {
+                0: '暂无现货市场进展或表格未给出信息',
+                1: '模拟/调电试运行',
+                2: '短周期结算试运行',
+                3: '长周期结算试运行',
+                4: '连续结算试运行',
+                5: '正式运行'
+            };
+
             const provinceAlias = {
                 '北京': '北京市', '天津': '天津市', '河北南网': '河北省', '冀北': '河北省',
                 '山东': '山东省', '山西': '山西省', '安徽': '安徽省', '福建': '福建省',
@@ -299,6 +308,7 @@
             const buildPolicyData = (entries, title) => {
                 const mapValues = {};
                 const details = {};
+                const labelMap = {};
 
                 entries.forEach(([rawName, value]) => {
                     const name = normalizeProvince(rawName);
@@ -306,27 +316,30 @@
                     mapValues[name] = level;
 
                     const levelInfo = policyLevelConfig[level] || policyLevelConfig[1];
+                    labelMap[name] = levelInfo.label;
                     details[name] = {
                         title: `${name} ${title}`,
-                        totalVolume: `政策等级：${levelInfo.label}`,
+                        totalVolume: `政策：${levelInfo.label}`,
                         marketVolumeDisplay: levelInfo.desc,
                         tags: [title, levelInfo.label],
                         heatValue: level,
                         details: [
-                            { label: '编码', value: level },
-                            { label: '政策等级', value: levelInfo.label },
+                            { label: '政策', value: levelInfo.label },
                             { label: '说明', value: levelInfo.desc }
                         ]
                     };
                 });
 
-                return { mapValues, details };
+                return { mapValues, details, labelMap };
             };
 
-            const buildSpotProgressData = (entries) => {
+            const buildSpotProgressData = (entries, longPolicyData, spotPolicyData) => {
                 const mapValues = {};
                 const details = {};
                 const remarkMap = {};
+                const policyMap = {};
+                const levelLabelMap = {};
+                const policyLabelMap = {};
 
                 entries.forEach(([rawName, rawLevel, remark]) => {
                     const name = normalizeProvince(rawName);
@@ -334,26 +347,42 @@
                     const currentLevel = mapValues[name] ?? 0;
                     const finalLevel = level > currentLevel ? level : currentLevel;
 
+                    const longPolicyLevel = longPolicyData?.mapValues?.[name];
+                    const spotPolicyLevel = spotPolicyData?.mapValues?.[name];
+                    const levelLabel = spotProgressLevelText[finalLevel] || spotProgressLevelText[0];
+                    const longPolicyLabel = longPolicyData?.labelMap?.[name] || (longPolicyLevel ? policyLevelConfig[longPolicyLevel]?.label : null);
+                    const spotPolicyLabel = spotPolicyData?.labelMap?.[name] || (spotPolicyLevel ? policyLevelConfig[spotPolicyLevel]?.label : null);
+
                     if (adcodeMap[name]) {
                         mapValues[name] = finalLevel;
                     }
 
                     remarkMap[name] = remark;
+                    policyMap[name] = { long: longPolicyLevel, spot: spotPolicyLevel };
+                    levelLabelMap[name] = levelLabel;
+                    policyLabelMap[name] = { long: longPolicyLabel, spot: spotPolicyLabel };
                     details[name] = {
                         title: `${name} 现货市场进程`,
-                        totalVolume: `成熟度等级：${finalLevel}级`,
+                        totalVolume: `成熟度：${levelLabel}`,
                         marketVolumeDisplay: remark || '暂无备注信息',
-                        tags: ['现货市场进程', `${finalLevel}级`],
+                        tags: [
+                            '现货市场进程',
+                            levelLabel,
+                            longPolicyLabel ? `中长期政策：${longPolicyLabel}` : null,
+                            spotPolicyLabel ? `现货政策：${spotPolicyLabel}` : null
+                        ].filter(Boolean),
                         heatValue: finalLevel,
                         remark,
                         details: [
-                            { label: '成熟度等级', value: `${finalLevel}级` },
-                            remark ? { label: '进展说明', value: remark } : null
+                            { label: '成熟度', value: levelLabel },
+                            remark ? { label: '进展说明', value: remark } : null,
+                            longPolicyLabel ? { label: '中长期政策', value: longPolicyLabel } : null,
+                            spotPolicyLabel ? { label: '现货政策', value: spotPolicyLabel } : null
                         ].filter(Boolean)
                     };
                 });
 
-                return { mapValues, details, remarkMap };
+                return { mapValues, details, remarkMap, policyMap, levelLabelMap, policyLabelMap };
             };
 
             const longTermPolicyData = buildPolicyData([
@@ -409,7 +438,7 @@
                 ['海南', 4, '2024年11月开展全月结算试运行，2025年6月29日起转入连续结算试运行'],
                 ['南方区域', 4, '南方区域整体在2024年11月开展全月结算试运行并于2025年6月29日起进入连续结算试运行'],
                 ['省间(国网与蒙西)', 6, '省间现货市场自2022年1月启动试运行并于2024年10月15日转入正式运行']
-            ]);
+            ], longTermPolicyData, spotPolicyData);
 
             // --- 辅助数据 ---
             const deepBlueProvinces = ['江苏省', '浙江省', '安徽省', '山东省'];
@@ -437,12 +466,7 @@
             const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
-            const policyColorScale = {
-                long: ['#e0ebff', '#9ec5ff', '#3b82f6'], // 中长期政策：柔和蓝系
-                spot: ['#e0fbff', '#9beef3', '#06b6d4']  // 现货政策：青色系
-            };
-
-            const spotProgressColorScale = ['#ffffff', '#f3e8ff', '#e4d4ff', '#c7b8ff', '#a78bfa', '#7c3aed']; // 现货进程：紫色系
+            const spotProgressColorScale = ['#ffffff', '#e0f2ff', '#b7d7ff', '#8abaff', '#4f8df9', '#1d4ed8']; // 现货进程：蓝色系
 
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
@@ -453,14 +477,10 @@
                 return palette[idx];
             };
 
-            const getPolicyPalette = () => energyView === 'policy-long' ? policyColorScale.long : policyColorScale.spot;
-
             // --- 数据选择逻辑 ---
             const currentData = useMemo(() => {
                 if (marketType === 'frequency') return frequencyData;
                 if (energyView === 'spot-progress') return spotProgressData;
-                if (energyView === 'policy-long') return longTermPolicyData;
-                if (energyView === 'policy-spot') return spotPolicyData;
                 return energyData;
             }, [marketType, energyView]);
 
@@ -498,7 +518,6 @@
             // 生成热力图数据 (根据当前市场类型)
             const generateMapData = () => {
                 const data = [];
-                const policyPalette = getPolicyPalette();
                 const values = currentData.mapValues || {};
 
                 Object.keys(values).forEach(name => {
@@ -516,22 +535,21 @@
                         } else if (energyView === 'spot-progress') {
                             const level = values[name] ?? 0;
                             const remark = currentData.remarkMap?.[name];
+                            const policyInfo = currentData.policyMap?.[name];
+                            const levelLabel = currentData.levelLabelMap?.[name] || spotProgressLevelText[level] || spotProgressLevelText[0];
+                            const policyLabels = currentData.policyLabelMap?.[name] || {};
                             data.push({
                                 name,
                                 value: level,
                                 itemStyle: { areaColor: spotProgressColorScale[level] || spotProgressColorScale[0], borderColor: '#fff', borderWidth: 1.2 },
                                 emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
                                 spotProgressLevel: level,
-                                remark
-                            });
-                        } else {
-                            const level = values[name];
-                            data.push({
-                                name,
-                                value: level,
-                                itemStyle: { areaColor: policyPalette[level - 1] || policyPalette[0], borderColor: '#fff', borderWidth: 1.2 },
-                                emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
-                                policyLevel: level
+                                spotProgressLabel: levelLabel,
+                                remark,
+                                longPolicyLevel: policyInfo?.long,
+                                spotPolicyLevel: policyInfo?.spot,
+                                longPolicyLabel: policyLabels.long,
+                                spotPolicyLabel: policyLabels.spot
                             });
                         }
                     } else {
@@ -604,21 +622,22 @@
                                         const level = params.data.spotProgressLevel;
                                         const remark = params.data.remark || currentData.remarkMap?.[params.name];
                                         const color = spotProgressColorScale[level] || spotProgressColorScale[0];
+                                        const longPolicy = params.data.longPolicyLevel;
+                                        const spotPolicy = params.data.spotPolicyLevel;
+                                        const levelLabel = params.data.spotProgressLabel || spotProgressLevelText[level] || spotProgressLevelText[0];
+                                        const longPolicyLabel = params.data.longPolicyLabel || (longPolicy ? policyLevelConfig[longPolicy]?.label : '');
+                                        const spotPolicyLabel = params.data.spotPolicyLabel || (spotPolicy ? policyLevelConfig[spotPolicy]?.label : '');
+                                        const policyLines = [
+                                            longPolicyLabel ? `<div style="font-size:12px; color:#1d4ed8;">中长期政策：${longPolicyLabel}</div>` : '',
+                                            spotPolicyLabel ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicyLabel}</div>` : ''
+                                        ].join('');
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
-                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度等级：<span style="font-weight:bold; color:${color};">${level}级</span></div>`
+                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度：<span style="font-weight:bold; color:${color};">${levelLabel}</span></div>`
+                                            + policyLines
                                             + (remark ? `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${remark}</div>` : '')
                                             + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                     }
 
-                                    if (params.data?.policyLevel) {
-                                        const level = params.data.policyLevel;
-                                        const levelInfo = policyLevelConfig[level] || policyLevelConfig[1];
-                                        const palette = getPolicyPalette();
-                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
-                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">政策等级：<span style="font-weight:bold; color:${palette[level - 1] || palette[0]};">${levelInfo.label}</span></div>`
-                                            + `<div style="font-size:12px; color:#0f172a; font-weight:500; line-height:1.6;">${levelInfo.desc}</div>`
-                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
-                                    }
                                     if (params.data?.energyCategory) {
                                         const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
                                         const display = energyData.displayMap[params.name] || params.value;
@@ -799,19 +818,13 @@
 
             const energyViewTitle = energyView === 'price'
                 ? '电能量市场热力图'
-                : energyView === 'policy-long'
-                    ? '电能量中长期政策热力图'
-                    : energyView === 'policy-spot'
-                        ? '电能量现货政策热力图'
-                        : '现货市场进程热力图';
+                : '现货市场进程热力图（含政策信息）';
 
             const detailSummaryTitle = marketType === 'frequency'
                 ? '调频收益概览'
                 : energyView === 'price'
                     ? '电能量市场概览'
-                    : energyView === 'spot-progress'
-                        ? '现货市场进程概览'
-                        : '电能量政策概览';
+                    : '现货市场进程概览';
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
@@ -877,24 +890,12 @@
                                             <div className="text-[11px] text-indigo-700 font-semibold flex items-center gap-2">
                                                 <Layers size={12} /> 电能量视图选择
                                             </div>
-                                            <div className="grid grid-cols-4 gap-2">
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <button
                                                     onClick={() => setEnergyView('price')}
                                                     className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-all ${energyView === 'price' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-700 bg-white/70'}`}
                                                 >
                                                     价差地图
-                                                </button>
-                                                <button
-                                                    onClick={() => setEnergyView('policy-long')}
-                                                    className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-all ${energyView === 'policy-long' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-700 bg-white/70'}`}
-                                                >
-                                                    中长期政策
-                                                </button>
-                                                <button
-                                                    onClick={() => setEnergyView('policy-spot')}
-                                                    className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-all ${energyView === 'policy-spot' ? 'bg-white text-indigo-700 border-indigo-200 shadow-sm' : 'text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-700 bg-white/70'}`}
-                                                >
-                                                    现货政策
                                                 </button>
                                                 <button
                                                     onClick={() => setEnergyView('spot-progress')}
@@ -904,7 +905,7 @@
                                                 </button>
                                             </div>
                                             <div className="text-[11px] text-slate-600 leading-relaxed">
-                                                价差 / 政策 / 现货进程三张热力图可在此切换，颜色均按程度由浅到深递进显示。
+                                                在价差与现货进程（含政策信息）两张热力图间切换，颜色均按程度由浅到深递进显示。
                                             </div>
                                         </div>
                                     )}
@@ -950,41 +951,32 @@
                                                         图例显示滑块两端的约值（无单位），点击省份查看区间或备注。
                                                     </div>
                                                 </div>
-                                            ) : energyView === 'spot-progress' ? (
+                                            ) : (
                                                 <div className="space-y-3 text-[11px] text-slate-700">
                                                     <div className="flex items-center gap-3">
                                                         <div
                                                             className="h-32 w-3 rounded-full shadow-inner"
                                                             style={{
-                                                                background: 'linear-gradient(to bottom, #7c3aed 0%, #a78bfa 30%, #c7b8ff 55%, #e4d4ff 78%, #f3e8ff 90%, #ffffff 100%)'
+                                                                background: 'linear-gradient(to bottom, #1d4ed8 0%, #4f8df9 30%, #8abaff 55%, #b7d7ff 78%, #e0f2ff 90%, #ffffff 100%)'
                                                             }}
                                                         ></div>
-                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-600 font-medium">
-                                                            {[5,4,3,2,1,0].map((level) => (
-                                                                <span key={`progress-${level}`}>{`${level}级`}</span>
-                                                            ))}
+                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-700 font-semibold">
+                                                            <span>成熟度高</span>
+                                                            <span>暂无现货进展</span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        0-5级逐级加深，0 为暂无信息，5 为正式运行；悬停或点击可查看备注。
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-3 text-[11px] text-slate-700">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[0], borderColor: '#dbeafe' }}></div>
-                                                        <span>1级：无政策（最浅色）</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[1], borderColor: '#bfdbfe' }}></div>
-                                                        <span>2级：经营主体包含储能（中间色）</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: getPolicyPalette()[2], borderColor: '#93c5fd' }}></div>
-                                                        <span className="text-indigo-700 font-semibold">3级：交易细则包含储能（最深色）</span>
+                                                    <div className="grid grid-cols-1 gap-1.5">
+                                                        {[5,4,3,2,1,0].map((level) => (
+                                                            <span
+                                                                key={`progress-${level}`}
+                                                                className="px-2 py-1 rounded-full bg-slate-50 border border-slate-100 text-slate-700 text-[11px]"
+                                                            >
+                                                                {spotProgressLevelText[level] || spotProgressLevelText[0]}
+                                                            </span>
+                                                        ))}
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        颜色由浅到深对应政策落地程度，上方按钮可切换中长期与现货政策图。
+                                                        蓝色越深代表现货市场成熟度越高，点击或悬停可查看各省的进展说明与政策信息。
                                                     </div>
                                                 </div>
                                             )}
