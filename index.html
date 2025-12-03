@@ -305,6 +305,29 @@
 
             const normalizeProvince = (name) => provinceAlias[name] || name;
 
+            const spotProgressColorScale = ['#ffffff', '#e0f2ff', '#b7d7ff', '#8abaff', '#4f8df9', '#1d4ed8']; // 现货进程：蓝色系
+
+            const spotResearchColorScale = {
+                researched: ['#fff7ed', '#ffedd5', '#fed7aa', '#fdba74', '#fb923c', '#ea580c'],
+                unresearched: spotProgressColorScale
+            };
+
+            const spotResearchLabelMap = {
+                'researched-active': '已调研（储能参与现货）',
+                'researched-upcoming': '已调研（即将对储能开放）',
+                'not-open': '未对储能实际开放'
+            };
+
+            const spotResearchStatusMap = {};
+            const setResearchStatus = (names, status) => names.forEach(name => {
+                const normalized = normalizeProvince(name);
+                spotResearchStatusMap[normalized] = status;
+            });
+
+            setResearchStatus(['宁夏回族自治区', '甘肃省', '山西省', '山东省', '蒙西', '广东省', '河北南网'], 'researched-active');
+            setResearchStatus(['河南省', '陕西省', '江苏省'], 'researched-upcoming');
+            setResearchStatus(['浙江省'], 'not-open');
+
             const buildPolicyData = (entries, title) => {
                 const mapValues = {};
                 const details = {};
@@ -346,6 +369,8 @@
                     const level = Math.max(0, Math.min(5, Number(rawLevel) || 0));
                     const currentLevel = mapValues[name] ?? 0;
                     const finalLevel = level > currentLevel ? level : currentLevel;
+                    const researchStatus = spotResearchStatusMap[name];
+                    const researchLabel = researchStatus ? spotResearchLabelMap[researchStatus] : '未调研';
 
                     const longPolicyLevel = longPolicyData?.mapValues?.[name];
                     const spotPolicyLevel = spotPolicyData?.mapValues?.[name];
@@ -369,20 +394,24 @@
                             '现货市场进程',
                             levelLabel,
                             longPolicyLabel ? `中长期政策：${longPolicyLabel}` : null,
-                            spotPolicyLabel ? `现货政策：${spotPolicyLabel}` : null
+                            spotPolicyLabel ? `现货政策：${spotPolicyLabel}` : null,
+                            researchLabel
                         ].filter(Boolean),
                         heatValue: finalLevel,
                         remark,
+                        researchStatus,
+                        researchLabel,
                         details: [
                             { label: '成熟度', value: levelLabel },
                             remark ? { label: '进展说明', value: remark } : null,
                             longPolicyLabel ? { label: '中长期政策', value: longPolicyLabel } : null,
-                            spotPolicyLabel ? { label: '现货政策', value: spotPolicyLabel } : null
+                            spotPolicyLabel ? { label: '现货政策', value: spotPolicyLabel } : null,
+                            { label: '储能调研', value: researchLabel }
                         ].filter(Boolean)
                     };
                 });
 
-                return { mapValues, details, remarkMap, policyMap, levelLabelMap, policyLabelMap };
+                return { mapValues, details, remarkMap, policyMap, levelLabelMap, policyLabelMap, researchStatusMap: spotResearchStatusMap };
             };
 
             const longTermPolicyData = buildPolicyData([
@@ -466,8 +495,6 @@
             const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
-            const spotProgressColorScale = ['#ffffff', '#e0f2ff', '#b7d7ff', '#8abaff', '#4f8df9', '#1d4ed8']; // 现货进程：蓝色系
-
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
                 const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
@@ -538,10 +565,14 @@
                             const policyInfo = currentData.policyMap?.[name];
                             const levelLabel = currentData.levelLabelMap?.[name] || spotProgressLevelText[level] || spotProgressLevelText[0];
                             const policyLabels = currentData.policyLabelMap?.[name] || {};
+                            const researchStatus = currentData.researchStatusMap?.[name];
+                            const researchLabel = researchStatus ? spotResearchLabelMap[researchStatus] : '未调研';
+                            const palette = researchStatus?.startsWith('researched') ? spotResearchColorScale.researched : spotResearchColorScale.unresearched;
+                            const areaColor = palette[level] || palette[0];
                             data.push({
                                 name,
                                 value: level,
-                                itemStyle: { areaColor: spotProgressColorScale[level] || spotProgressColorScale[0], borderColor: '#fff', borderWidth: 1.2 },
+                                itemStyle: { areaColor, borderColor: '#fff', borderWidth: 1.2 },
                                 emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
                                 spotProgressLevel: level,
                                 spotProgressLabel: levelLabel,
@@ -549,7 +580,9 @@
                                 longPolicyLevel: policyInfo?.long,
                                 spotPolicyLevel: policyInfo?.spot,
                                 longPolicyLabel: policyLabels.long,
-                                spotPolicyLabel: policyLabels.spot
+                                spotPolicyLabel: policyLabels.spot,
+                                researchStatus,
+                                researchLabel
                             });
                         }
                     } else {
@@ -621,15 +654,20 @@
                                     if (params.data?.spotProgressLevel !== undefined) {
                                         const level = params.data.spotProgressLevel;
                                         const remark = params.data.remark || currentData.remarkMap?.[params.name];
-                                        const color = spotProgressColorScale[level] || spotProgressColorScale[0];
+                                        const researchStatus = params.data.researchStatus || currentData.researchStatusMap?.[params.name];
+                                        const palette = researchStatus?.startsWith('researched') ? spotResearchColorScale.researched : spotResearchColorScale.unresearched;
+                                        const color = palette[level] || palette[0];
                                         const longPolicy = params.data.longPolicyLevel;
                                         const spotPolicy = params.data.spotPolicyLevel;
                                         const levelLabel = params.data.spotProgressLabel || spotProgressLevelText[level] || spotProgressLevelText[0];
                                         const longPolicyLabel = params.data.longPolicyLabel || (longPolicy ? policyLevelConfig[longPolicy]?.label : '');
                                         const spotPolicyLabel = params.data.spotPolicyLabel || (spotPolicy ? policyLevelConfig[spotPolicy]?.label : '');
+                                        const researchLabel = researchStatus ? spotResearchLabelMap[researchStatus] : '未调研（默认蓝色系）';
+                                        const researchColor = researchStatus?.startsWith('researched') ? '#ea580c' : '#1d4ed8';
                                         const policyLines = [
                                             longPolicyLabel ? `<div style="font-size:12px; color:#1d4ed8;">中长期政策：${longPolicyLabel}</div>` : '',
-                                            spotPolicyLabel ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicyLabel}</div>` : ''
+                                            spotPolicyLabel ? `<div style="font-size:12px; color:#0ea5e9;">现货政策：${spotPolicyLabel}</div>` : '',
+                                            `<div style="font-size:12px; color:${researchColor};">储能调研：${researchLabel}</div>`
                                         ].join('');
                                         return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
                                             + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">成熟度：<span style="font-weight:bold; color:${color};">${levelLabel}</span></div>`
@@ -953,16 +991,32 @@
                                                 </div>
                                             ) : (
                                                 <div className="space-y-3 text-[11px] text-slate-700">
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className="h-32 w-3 rounded-full shadow-inner"
-                                                            style={{
-                                                                background: 'linear-gradient(to bottom, #1d4ed8 0%, #4f8df9 30%, #8abaff 55%, #b7d7ff 78%, #e0f2ff 90%, #ffffff 100%)'
-                                                            }}
-                                                        ></div>
-                                                        <div className="flex flex-col justify-between h-32 text-[11px] text-slate-700 font-semibold">
-                                                            <span>成熟度高</span>
-                                                            <span>暂无现货进展</span>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div
+                                                                className="h-24 w-3 rounded-full shadow-inner"
+                                                                style={{
+                                                                    background: 'linear-gradient(to bottom, #ea580c 0%, #fb923c 30%, #fdba74 55%, #fed7aa 78%, #ffedd5 90%, #fff7ed 100%)'
+                                                                }}
+                                                            ></div>
+                                                            <div className="flex flex-col justify-between h-24 text-[11px] text-slate-700 font-semibold">
+                                                                <span>成熟度高</span>
+                                                                <span>暂无现货进展</span>
+                                                            </div>
+                                                            <span className="text-[11px] text-amber-700 font-semibold px-2 py-1 bg-amber-50 border border-amber-100 rounded">已调研储能省份</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div
+                                                                className="h-24 w-3 rounded-full shadow-inner"
+                                                                style={{
+                                                                    background: 'linear-gradient(to bottom, #1d4ed8 0%, #4f8df9 30%, #8abaff 55%, #b7d7ff 78%, #e0f2ff 90%, #ffffff 100%)'
+                                                                }}
+                                                            ></div>
+                                                            <div className="flex flex-col justify-between h-24 text-[11px] text-slate-700 font-semibold">
+                                                                <span>成熟度高</span>
+                                                                <span>暂无现货进展</span>
+                                                            </div>
+                                                            <span className="text-[11px] text-sky-700 font-semibold px-2 py-1 bg-sky-50 border border-sky-100 rounded">未调研 / 暂未开放</span>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 gap-1.5">
@@ -976,7 +1030,7 @@
                                                         ))}
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                                                        蓝色越深代表现货市场成熟度越高，点击或悬停可查看各省的进展说明与政策信息。
+                                                        黄色系表示已调研、储能已参与或即将参与现货的省份，蓝色系表示未调研或暂未对储能开放；颜色越深代表成熟度越高，点击或悬停可查看进展说明与政策信息。
                                                     </div>
                                                 </div>
                                             )}
