@@ -273,6 +273,41 @@
                 '海南省': { range: [0.397, 0.737], display: '0.397~0.737 元/kWh', note: '南网：峰谷价差区间', category: 'market' }
             };
 
+            const provinceReportNotes = {
+                '青海省': {
+                    summary: '截至2025年9月8日，全口径装机容量约 7728.525 万千瓦，新能源装机占比 72.13%，风光装机比例约 3:1，西部西宁主力电网与中部电网相连。',
+                    extraTags: ['装机 7728.525 万千瓦', '新能源占比 72.13%'],
+                    details: [
+                        {
+                            label: '能源与电网概况',
+                            value: '水电 1639.218 万千瓦（21.21%）、火电 699.200 万千瓦（9.04%）、风电 1353.315 万千瓦（17.51%）、太阳能 3547.29 万千瓦（45.90%）、储能 519.44 万千瓦（6.71%）。'
+                        },
+                        {
+                            label: '电网频率与外送通道',
+                            value: '单一电网与外送通道较为薄弱，西部西宁主力电网与中部电网相连，电力以外送为主，电网通道数量较少。'
+                        }
+                    ]
+                },
+                '甘肃省': {
+                    summary: '截至2025年9月，装机容量约 11162.75 万千瓦，新能源装机占比 58.65%，风光装机占比超过 58%。',
+                    extraTags: ['装机 11162.75 万千瓦', '新能源占比 58.65%'],
+                    details: [
+                        {
+                            label: '能源与电网概况',
+                            value: '火电 3017.51 万千瓦（27.13%）、水电 971.28 万千瓦（8.70%）、风电 3710.80 万千瓦（33.27%）、太阳能 2803.93 万千瓦（25.12%）、储能 659.48 万千瓦（5.91%）。'
+                        },
+                        {
+                            label: '电网频率与外送通道',
+                            value: '电网频率高，双向并网，网强度高且外送通道较多，线路包括双回路，出口以多个直流外送通道为主。'
+                        },
+                        {
+                            label: '电力负荷与需求',
+                            value: '电力负荷需求较高，工业用电为主，工商业负荷占比较大，电力供应较为紧张。'
+                        }
+                    ]
+                }
+            };
+
             const buildEnergyData = () => {
                 const mapValues = {};
                 const details = {};
@@ -292,7 +327,7 @@
                     rangeMap[name] = info.range;
                     (info.category === 'actual' ? actualValues : marketValues).push(midValue);
 
-                    details[name] = {
+                    const baseDetails = {
                         title: `${name} 电能量价差`,
                         totalVolume: info.display,
                         marketVolumeDisplay: info.note ? `${info.display} ｜ ${info.note}` : info.display,
@@ -303,6 +338,19 @@
                             info.note ? { label: '备注', value: info.note } : null
                         ].filter(Boolean)
                     };
+
+                    const report = provinceReportNotes[name];
+                    if (report) {
+                        baseDetails.marketVolumeDisplay = `${baseDetails.marketVolumeDisplay} ｜ ${report.summary}`;
+                        if (Array.isArray(report.extraTags)) {
+                            baseDetails.tags = [...baseDetails.tags, ...report.extraTags];
+                        }
+                        if (Array.isArray(report.details)) {
+                            baseDetails.details.push(...report.details);
+                        }
+                    }
+
+                    details[name] = baseDetails;
                 });
 
                 const calcRange = (values) => {
