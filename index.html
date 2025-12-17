@@ -1251,9 +1251,22 @@
 
             useEffect(() => {
                 if (!pieContainerRef.current) return;
-                const hasData = selectedProvinceInfo?.resourcePieData?.length;
 
-                if (!hasData) {
+                const provinceName = selectedProvinceName || currentProvince;
+                const fallbackMetrics = provinceName ? resourceEndowment[provinceName] : null;
+                const fallbackPieData = fallbackMetrics
+                    ? Object.entries(fallbackMetrics || {}).map(([k, v]) => ({
+                        name: resourceLabels[k] || k,
+                        value: Number(v) || 0,
+                        key: k
+                    })).sort((a, b) => b.value - a.value)
+                    : null;
+
+                const pieData = selectedProvinceInfo?.resourcePieData?.length
+                    ? selectedProvinceInfo.resourcePieData
+                    : fallbackPieData;
+
+                if (!pieData?.length) {
                     if (pieInstanceRef.current) {
                         pieInstanceRef.current.dispose();
                         pieInstanceRef.current = null;
@@ -1275,12 +1288,12 @@
                         radius: ['40%', '70%'],
                         itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
                         label: { formatter: '{b}: {d}%', color: '#0f172a' },
-                        data: selectedProvinceInfo.resourcePieData
+                        data: pieData
                     }]
                 });
 
                 pieInstanceRef.current.resize();
-            }, [selectedProvinceInfo]);
+            }, [selectedProvinceInfo, selectedProvinceName, currentProvince, resourceEndowment, resourceLabels]);
 
             useEffect(() => {
                 const handlePieResize = () => {
