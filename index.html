@@ -53,6 +53,8 @@
         const EnergyMarketMap = () => {
             const mapContainerRef = useRef(null);
             const chartInstanceRef = useRef(null);
+            const pieContainerRef = useRef(null);
+            const pieInstanceRef = useRef(null);
             
             // --- 核心状态 ---
             const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
@@ -97,6 +99,12 @@
                     highlight: hoverHighlightColor,
                     iconBg: 'bg-blue-50', iconText: 'text-blue-700', iconBorder: 'border-blue-100',
                     gradientFrom: 'from-[#001A72]', gradientTo: 'to-[#66D4FF]'
+                },
+                resource: {
+                    map: ['#ecfdf3', '#d1fae5', '#a7f3d0', '#6ee7b7', '#34d399', '#10b981', '#047857'],
+                    highlight: '#f59e0b',
+                    iconBg: 'bg-green-50', iconText: 'text-emerald-700', iconBorder: 'border-green-100',
+                    gradientFrom: 'from-emerald-700', gradientTo: 'to-lime-300'
                 }
             };
 
@@ -112,6 +120,35 @@
             };
 
             // --- 数据源 ---
+
+            // A0. 资源禀赋数据（可扩展、可上传）
+            const [resourceEndowment, setResourceEndowment] = useState({
+                '河北省': { wind: 32, solar: 26, hydro: 3, thermal: 45 },
+                '山西省': { wind: 28, solar: 22, hydro: 2, thermal: 58 },
+                '广东省': { wind: 18, solar: 30, hydro: 16, thermal: 38 },
+                '甘肃省': { wind: 40, solar: 35, hydro: 6, thermal: 20 },
+                '河南省': { wind: 20, solar: 24, hydro: 5, thermal: 50 },
+                '江苏省': { wind: 26, solar: 34, hydro: 8, thermal: 40 },
+                '浙江省': { wind: 16, solar: 28, hydro: 12, thermal: 30 },
+                '陕西省': { wind: 30, solar: 22, hydro: 10, thermal: 35 },
+                '青海省': { wind: 22, solar: 40, hydro: 18, thermal: 12 },
+                '四川省': { wind: 14, solar: 18, hydro: 60, thermal: 12 },
+                '云南省': { wind: 20, solar: 22, hydro: 55, thermal: 10 },
+                '辽宁省': { wind: 25, solar: 18, hydro: 8, thermal: 35 },
+                '内蒙古自治区': { wind: 55, solar: 48, hydro: 5, thermal: 20 },
+                '新疆维吾尔自治区': { wind: 50, solar: 52, hydro: 8, thermal: 18 }
+            });
+
+            const [resourceLabels, setResourceLabels] = useState({
+                wind: '风电装机 (GW)',
+                solar: '光伏装机 (GW)',
+                hydro: '水电装机 (GW)',
+                thermal: '火电装机 (GW)'
+            });
+
+            const [resourceMetric, setResourceMetric] = useState('wind');
+            const [resourceInput, setResourceInput] = useState('');
+            const [gridPreview, setGridPreview] = useState(null);
 
             // A. 二次调频数据 (Frequency Data) - 沿用之前的数据
             const frequencyData = {
@@ -277,6 +314,48 @@
             };
 
             const energyData = buildEnergyData();
+
+            // 资源禀赋动态视图
+            const resourceMetrics = useMemo(() => {
+                const keys = new Set();
+                Object.values(resourceEndowment || {}).forEach(item => {
+                    Object.keys(item || {}).forEach(k => keys.add(k));
+                });
+                return Array.from(keys);
+            }, [resourceEndowment]);
+
+            const resourceRange = useMemo(() => {
+                const values = Object.values(resourceEndowment || {}).map(v => Number(v?.[resourceMetric]) || 0);
+                if (!values.length) return { min: 0, max: 1 };
+                return { min: Math.min(...values), max: Math.max(...values) };
+            }, [resourceEndowment, resourceMetric]);
+
+            const resourceData = useMemo(() => {
+                const mapValues = {};
+                const details = {};
+
+                Object.entries(resourceEndowment || {}).forEach(([province, metrics]) => {
+                    const value = Number(metrics?.[resourceMetric]) || 0;
+                    const total = Object.values(metrics || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                    const pieData = Object.entries(metrics || {}).map(([k, v]) => ({
+                        name: resourceLabels[k] || k,
+                        value: Number(v) || 0,
+                        key: k
+                    })).sort((a, b) => b.value - a.value);
+
+                    mapValues[province] = value;
+                    details[province] = {
+                        title: `${province} 资源禀赋`,
+                        totalVolume: `${resourceLabels[resourceMetric] || resourceMetric}: ${value} GW`,
+                        marketVolumeDisplay: `合计装机约 ${total.toFixed(1)} GW，点击下方饼图查看结构`,
+                        tags: ['资源禀赋', '可编辑', resourceLabels[resourceMetric] || resourceMetric],
+                        resourcePieData: pieData,
+                        details: pieData.map(item => ({ label: item.name, value: `${item.value} GW` }))
+                    };
+                });
+
+                return { mapValues, details };
+            }, [resourceEndowment, resourceMetric, resourceLabels]);
 
             // C. 电能量政策热力数据
             const policyLevelConfig = {
@@ -498,6 +577,15 @@
             const actualScaleLabels = buildScaleLabels(energyData.ranges.actual);
             const marketScaleLabels = buildScaleLabels(energyData.ranges.market);
 
+            const getResourceColor = (value) => {
+                const { min, max } = resourceRange;
+                const palette = colorPalettes.resource.map;
+                const safeSpan = max - min || 1;
+                const ratio = Math.min(1, Math.max(0, (value - min) / safeSpan));
+                const idx = Math.min(palette.length - 1, Math.floor(ratio * (palette.length - 1)));
+                return palette[idx];
+            };
+
             const getEnergyColor = (value, category) => {
                 const palette = energyColorScale[category === 'actual' ? 'actual' : 'market'];
                 const { min, max } = energyData.ranges[category === 'actual' ? 'actual' : 'market'];
@@ -511,8 +599,9 @@
             const currentData = useMemo(() => {
                 if (marketType === 'frequency') return frequencyData;
                 if (energyView === 'spot-progress') return spotProgressData;
+                if (marketType === 'resource') return resourceData;
                 return energyData;
-            }, [marketType, energyView]);
+            }, [marketType, energyView, resourceData]);
 
             // --- 数据转换函数 ---
             const convertPointData = (data) => {
@@ -588,6 +677,14 @@
                                 researchLabel
                             });
                         }
+                    } else if (marketType === 'resource') {
+                        const color = getResourceColor(values[name]);
+                        data.push({
+                            name,
+                            value: values[name],
+                            itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
+                            emphasis: { itemStyle: { areaColor: currentPalette.highlight } }
+                        });
                     } else {
                         data.push({ name: name, value: values[name] });
                     }
@@ -718,6 +815,16 @@
                                                 + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                         }
                                     }
+
+                                    if (marketType === 'resource') {
+                                        const info = currentData.details?.[params.name];
+                                        if (info) {
+                                            return `<div style="font-weight:bold; font-size:14px; margin-bottom:6px;">${params.name}</div>`
+                                                + `<div style=\"font-size:12px; color:#047857; font-weight:700; margin-bottom:6px;\">${info.totalVolume}</div>`
+                                                + `<div style="font-size:12px; color:#0f172a; line-height:1.5;">${info.marketVolumeDisplay}</div>`
+                                                + `<div style=\"font-size:12px; color:#047857; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;\">🖱 双击进入省级地图</div>`;
+                                        }
+                                    }
                                     return params.name;
                                 }
                             },
@@ -821,10 +928,38 @@
                 }
             };
 
+            const handleResourceApply = () => {
+                if (!resourceInput.trim()) return;
+                const lines = resourceInput.split('\n').map(l => l.trim()).filter(Boolean);
+                if (!lines.length) return;
+
+                setResourceEndowment(prev => {
+                    const next = { ...prev };
+                    lines.forEach(line => {
+                        const [province, metricKey, rawValue] = line.split(/[,，]/).map(v => v.trim());
+                        const numValue = parseFloat(rawValue);
+                        if (province && metricKey && !isNaN(numValue)) {
+                            next[province] = { ...(next[province] || {}), [metricKey]: numValue };
+                            setResourceLabels(old => old[metricKey] ? old : ({ ...old, [metricKey]: `${metricKey} (自定义)` }));
+                        }
+                    });
+                    return next;
+                });
+                setResourceInput('');
+            };
+
+            const handleGridUpload = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => setGridPreview(e.target.result);
+                reader.readAsDataURL(file);
+            };
+
             // 监听变化
             useEffect(() => {
                 loadMap(viewMode, currentProvince);
-            }, [viewMode, currentProvince, marketType, energyView]);
+            }, [viewMode, currentProvince, marketType, energyView, resourceData]);
 
             // 切换市场时重置视图
             useEffect(() => {
@@ -851,6 +986,36 @@
                 return () => window.removeEventListener('resize', handleResize);
             }, []);
 
+            useEffect(() => {
+                if (!pieContainerRef.current) return;
+                const hasData = selectedProvinceInfo?.resourcePieData?.length;
+
+                if (!hasData) {
+                    if (pieInstanceRef.current) {
+                        pieInstanceRef.current.dispose();
+                        pieInstanceRef.current = null;
+                    }
+                    return;
+                }
+
+                if (!pieInstanceRef.current) {
+                    pieInstanceRef.current = echarts.init(pieContainerRef.current);
+                }
+
+                pieInstanceRef.current.setOption({
+                    tooltip: { trigger: 'item' },
+                    legend: { show: false },
+                    series: [{
+                        name: '资源占比',
+                        type: 'pie',
+                        radius: ['40%', '70%'],
+                        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+                        label: { formatter: '{b}: {d}%', color: '#0f172a' },
+                        data: selectedProvinceInfo.resourcePieData
+                    }]
+                });
+            }, [selectedProvinceInfo]);
+
             const handleBack = () => {
                 setViewMode('china');
                 setCurrentProvince(null);
@@ -863,9 +1028,19 @@
 
             const detailSummaryTitle = marketType === 'frequency'
                 ? '调频收益概览'
-                : energyView === 'price'
-                    ? '电能量市场概览'
-                    : '现货市场进程概览';
+                : marketType === 'resource'
+                    ? '资源禀赋概览'
+                    : energyView === 'price'
+                        ? '电能量市场概览'
+                        : '现货市场进程概览';
+
+            const mainTitle = viewMode === 'province'
+                ? `${currentProvince}详情`
+                : (marketType === 'frequency'
+                    ? '二次调频市场热力图'
+                    : marketType === 'resource'
+                        ? '资源禀赋热力图'
+                        : energyViewTitle);
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
@@ -882,9 +1057,7 @@
                             )}
                             
                             <div>
-                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                                    {viewMode === 'province' ? `${currentProvince}详情` : (marketType === 'frequency' ? '二次调频市场热力图' : energyViewTitle)}
-                                </h1>
+                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{mainTitle}</h1>
                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                                     <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${currentPalette.iconBg} ${currentPalette.iconText} ${currentPalette.iconBorder}`}>
                                         {viewMode === 'province' ? <MapIcon size={12} /> : <Zap size={12} fill="currentColor" />}
@@ -923,6 +1096,12 @@
                                         >
                                             <BatteryCharging size={14} /> 电能量
                                         </button>
+                                        <button
+                                            onClick={() => setMarketType('resource')}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'resource' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Layers size={14} /> 资源禀赋
+                                        </button>
                                     </div>
 
                                     {/* 电能量视图切换器 */}
@@ -951,6 +1130,51 @@
                                         </div>
                                     )}
 
+                                    {marketType === 'resource' && (
+                                        <div className="space-y-3 bg-emerald-50/70 border border-emerald-100 rounded-lg p-3">
+                                            <div className="text-[11px] text-emerald-800 font-semibold flex items-center gap-2">
+                                                <Layers size={12} /> 资源禀赋视图选择
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[11px] text-slate-600">选择要绘制的装机口径</label>
+                                                <select
+                                                    value={resourceMetric}
+                                                    onChange={(e) => setResourceMetric(e.target.value)}
+                                                    className="w-full rounded-md border border-emerald-200 bg-white px-2 py-1 text-sm text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                                >
+                                                    {resourceMetrics.map(key => (
+                                                        <option key={key} value={key}>{resourceLabels[key] || key}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="text-[11px] text-slate-600 leading-relaxed bg-white/60 border border-emerald-100 rounded-md p-2">
+                                                任意指标都可成为热力图底层数据。输入“省份,指标,数值”可追加装机信息，支持多行批量导入。
+                                            </div>
+                                            <textarea
+                                                value={resourceInput}
+                                                onChange={(e) => setResourceInput(e.target.value)}
+                                                placeholder="示例: 河北省,风电,36.5\n甘肃省,光伏,42"
+                                                className="w-full h-20 text-sm rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            ></textarea>
+                                            <button
+                                                onClick={handleResourceApply}
+                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-md shadow-sm"
+                                            >
+                                                应用资源录入
+                                            </button>
+                                            <div className="space-y-2 pt-1">
+                                                <label className="text-[11px] text-slate-600">上传网架/规划示意图 (图片)</label>
+                                                <input type="file" accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
+                                                {gridPreview && (
+                                                    <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                        <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover" />
+                                                        <div className="text-[10px] text-slate-500 px-2 py-1">已加载网架图，可用于汇报展示</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* 1. 收益/热度图例 */}
                                     {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -966,6 +1190,20 @@
                                                         <span>中</span>
                                                         <span>中低</span>
                                                         <span>低</span>
+                                                    </div>
+                                                </div>
+                                            ) : marketType === 'resource' ? (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-24 w-3 rounded-full shadow-inner bg-gradient-to-b from-emerald-900 via-emerald-500 to-emerald-100"></div>
+                                                        <div className="flex flex-col justify-between h-24 text-[11px] text-slate-600 font-medium">
+                                                            <span>{formatPriceLabel(resourceRange.max)} GW</span>
+                                                            <span>{formatPriceLabel(resourceRange.min)} GW</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-emerald-800 font-semibold px-2 py-1 bg-emerald-50 border border-emerald-100 rounded">装机规模</span>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-emerald-100 rounded-lg p-2">
+                                                        绿色越深表示装机规模越大，可自由切换口径、支持自定义录入和网架图叠加。
                                                     </div>
                                                 </div>
                                             ) : energyView === 'price' ? (
@@ -1123,7 +1361,7 @@
                                         <div>
                                             <div className="flex items-center gap-2 mb-1"><h2 className="text-2xl font-bold text-slate-800">{selectedProvinceInfo.title}</h2></div>
                                             <div className="flex flex-wrap gap-2 mt-2">
-                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
+                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-blue-100 text-blue-700 border-blue-200' : marketType === 'resource' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
                                                 {selectedProvinceInfo.tags && selectedProvinceInfo.tags.map((tag, i) => <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">{tag}</span>)}
                                             </div>
                                         </div>
@@ -1131,14 +1369,21 @@
                                     </div>
                                     <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
                                         {/* 动态卡片颜色 */}
-                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
-                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : 'from-indigo-50'}`}></div>}
-                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-blue-700' : 'text-indigo-600'}`}>
-                                                {marketType === 'frequency' ? <Coins size={20} /> : <Zap size={20} />}
+                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : marketType === 'resource' ? 'bg-white border-emerald-100 shadow-emerald-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
+                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : marketType === 'resource' ? 'from-emerald-50' : 'from-indigo-50'}`}></div>}
+                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-blue-700' : marketType === 'resource' ? 'text-emerald-700' : 'text-indigo-600'}`}>
+                                                {marketType === 'frequency' ? <Coins size={20} /> : marketType === 'resource' ? <Layers size={20} /> : <Zap size={20} />}
                                                 <span>{detailSummaryTitle}</span>
                                             </div>
                                             <p className="text-lg text-slate-800 font-medium leading-relaxed">{selectedProvinceInfo.marketVolumeDisplay}</p>
                                         </div>
+
+                                        {selectedProvinceInfo.resourcePieData && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider"><MapIcon size={14} />资源结构</div>
+                                                <div ref={pieContainerRef} className="w-full h-56" />
+                                            </div>
+                                        )}
                                         
                                         {selectedProvinceInfo.details && (
                                             <div className="space-y-4">
