@@ -1039,8 +1039,10 @@
                         if (params.componentType !== 'series' || params.seriesType !== 'map') return;
                         const clickedName = params.name;
                         const provinceInfo = currentData.details[clickedName];
-                        if (provinceInfo) {
-                            setSelectedProvinceInfo(provinceInfo);
+                        const unifiedInfo = getUnifiedProvinceDetail(clickedName);
+
+                        if (provinceInfo || unifiedInfo) {
+                            setSelectedProvinceInfo({ ...(provinceInfo || {}), ...(unifiedInfo || {}) });
                             setSelectedProvinceName(clickedName);
                         } else {
                             setSelectedProvinceInfo(null);
@@ -1055,7 +1057,9 @@
                         const clickedName = params.name;
                         if (adcodeMap[clickedName] && currentData.details[clickedName]) {
                             setCurrentProvince(clickedName);
-                            setSelectedProvinceInfo(getUnifiedProvinceDetail(clickedName));
+                            const provinceInfo = currentData.details[clickedName];
+                            const unifiedInfo = getUnifiedProvinceDetail(clickedName);
+                            setSelectedProvinceInfo({ ...(provinceInfo || {}), ...(unifiedInfo || {}) });
                             setSelectedProvinceName(clickedName);
                             setViewMode('province');
                         }
