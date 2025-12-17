@@ -1313,6 +1313,16 @@
                 }
             }, [viewMode, currentProvince, marketType, energyView, resourceData]);
 
+            useEffect(() => {
+                if (viewMode === 'province' && currentProvince) {
+                    const provinceInfo = buildUnifiedProvinceDetail(currentProvince);
+                    if (provinceInfo) {
+                        setSelectedProvinceInfo(provinceInfo);
+                        setSelectedProvinceName(currentProvince);
+                    }
+                }
+            }, [viewMode, currentProvince, marketType, energyView, resourceData]);
+
             // 切换市场时重置视图
             useEffect(() => {
                 setViewMode('china');
