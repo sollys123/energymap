@@ -416,8 +416,8 @@
                             </div>
                         </div>
 
-                        <div className="mt-4 flex flex-col gap-2">
-                            {(data.kpis || []).slice(0, 3).map((item, idx) => (
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {(data.kpis || []).map((item, idx) => (
                                 <div
                                     key={idx}
                                     className="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
@@ -485,7 +485,7 @@
                                                                 <div className="text-xs text-slate-500">{accordion.capacityData.note}</div>
                                                             )}
                                                         </div>
-                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                        <div className="space-y-4">
                                                             <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
                                                                 <div className="grid grid-cols-3 bg-slate-50 text-xs font-semibold text-slate-600">
                                                                     {(accordion.capacityData.headers || []).map((header, idx) => (
@@ -504,7 +504,7 @@
                                                                     ))}
                                                                 </div>
                                                             </div>
-                                                            <div className="h-64" ref={capacityPieRef}></div>
+                                                            <div className="h-64 w-full" ref={capacityPieRef}></div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -684,11 +684,14 @@
             const [selectedProvinceName, setSelectedProvinceName] = useState(null);
             const [loading, setLoading] = useState(true);
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [sidebarWidth, setSidebarWidth] = useState(288);
+            const [isResizingSidebar, setIsResizingSidebar] = useState(false);
             const [interactionMode, setInteractionMode] = useState('view'); // 'view' | 'edit'
             const [gridUploads, setGridUploads] = useState({});
             const [gridUploadProvince, setGridUploadProvince] = useState('');
             const [showArchivePanel, setShowArchivePanel] = useState(false);
             const [previewImage, setPreviewImage] = useState(null);
+            const sidebarResizeDataRef = useRef({ startX: 0, startWidth: 288 });
 
             // --- 省份 Adcode 映射 ---
             const adcodeMap = {
@@ -1992,6 +1995,32 @@
                 setSelectedProvinceName(null);
             };
 
+            const startSidebarResize = (event) => {
+                if (!isSidebarOpen) return;
+                sidebarResizeDataRef.current = { startX: event.clientX, startWidth: sidebarWidth };
+                setIsResizingSidebar(true);
+            };
+
+            useEffect(() => {
+                if (!isResizingSidebar) return;
+
+                const handleMouseMove = (event) => {
+                    const delta = event.clientX - sidebarResizeDataRef.current.startX;
+                    const nextWidth = Math.min(Math.max(sidebarResizeDataRef.current.startWidth + delta, 240), 480);
+                    setSidebarWidth(nextWidth);
+                };
+
+                const handleMouseUp = () => setIsResizingSidebar(false);
+
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    window.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [isResizingSidebar]);
+
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
                     {interactionMode === 'edit' && (
@@ -2081,7 +2110,10 @@
                         <div className="w-full h-full bg-slate-50 flex">
                             
                             {/* --- 左侧伸缩面板 --- */}
-                            <div className={`absolute left-0 top-0 bottom-0 z-40 bg-white/95 backdrop-blur shadow-xl border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full overflow-hidden'}`}>
+                            <div
+                                className="absolute left-0 top-0 bottom-0 z-40 bg-white/95 backdrop-blur shadow-xl border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
+                                style={{ width: isSidebarOpen ? `${sidebarWidth}px` : 0, transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+                            >
                                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                                     <div className="flex items-center gap-2 text-slate-700 font-bold">
                                         <Layers size={18} />
@@ -2371,12 +2403,20 @@
                                             + 添加更多筛选器 (预留)
                                         </div>
                                     </div>
-                                </div>
+                                    </div>
+                                {isSidebarOpen && (
+                                    <div
+                                        className={`absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent transition-colors ${isResizingSidebar ? 'bg-slate-200/80' : 'hover:bg-slate-200/70'}`}
+                                        onMouseDown={startSidebarResize}
+                                        title="拖拽以调整侧边栏宽度"
+                                    ></div>
+                                )}
                             </div>
 
-                            <button 
+                            <button
                                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                className={`absolute top-4 z-30 bg-white p-2 rounded-r-lg shadow-md border border-l-0 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all duration-300 ${isSidebarOpen ? 'left-72' : 'left-0'}`}
+                                className="absolute top-4 z-30 bg-white p-2 rounded-r-lg shadow-md border border-l-0 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all duration-300"
+                                style={{ left: isSidebarOpen ? sidebarWidth : 0 }}
                             >
                                 {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                             </button>
