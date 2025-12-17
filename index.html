@@ -64,7 +64,7 @@
             const pieInstanceRef = useRef(null);
             
             // --- 核心状态 ---
-            const [marketType, setMarketType] = useState('frequency'); // 'frequency' (二次调频) | 'energy' (电能量)
+            const [marketType, setMarketType] = useState('frequency'); // 'overview' | 'frequency' | 'energy' | 'resource'
             const [energyView, setEnergyView] = useState('price'); // 'price' | 'spot-progress'
             const [viewMode, setViewMode] = useState('china'); // 'china' | 'province'
             const [currentProvince, setCurrentProvince] = useState(null);
@@ -72,9 +72,11 @@
             const [selectedProvinceName, setSelectedProvinceName] = useState(null);
             const [loading, setLoading] = useState(true);
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [interactionMode, setInteractionMode] = useState('view'); // 'view' | 'edit'
             const [gridUploads, setGridUploads] = useState({});
             const [gridUploadProvince, setGridUploadProvince] = useState('');
             const [showArchivePanel, setShowArchivePanel] = useState(false);
+            const [previewImage, setPreviewImage] = useState(null);
 
             // --- 省份 Adcode 映射 ---
             const adcodeMap = {
@@ -97,6 +99,12 @@
 
             // 1. 颜色配置 (根据市场类型切换)
             const colorPalettes = {
+                overview: {
+                    map: ['#f4f4f5', '#0ea5e9', '#34d399'],
+                    highlight: hoverHighlightColor,
+                    iconBg: 'bg-slate-50', iconText: 'text-slate-700', iconBorder: 'border-slate-100',
+                    gradientFrom: 'from-slate-800', gradientTo: 'to-blue-400'
+                },
                 frequency: {
                     // 品牌蓝色系 (代表热度/收益)
                     map: [brandBlueScale[6], brandBlueScale[5], brandBlueScale[4], brandBlueScale[3], brandBlueScale[2]],
@@ -373,6 +381,46 @@
             };
 
             const energyData = buildEnergyData();
+
+            const overviewData = useMemo(() => {
+                const freqProvinces = Object.keys(frequencyData.mapValues || {});
+                const energyProvinces = Object.keys(energyData.mapValues || {});
+                const overviewValues = {};
+                const overviewDetails = {};
+                const categoryMap = {};
+
+                freqProvinces.forEach(name => {
+                    overviewValues[name] = 2;
+                    categoryMap[name] = 'frequency';
+                    overviewDetails[name] = {
+                        title: `${name} ｜ 调频省份`,
+                        totalVolume: frequencyData.details?.[name]?.totalVolume || '调频热点',
+                        marketVolumeDisplay: frequencyData.details?.[name]?.marketVolumeDisplay || '调频市场重点省份',
+                        tags: ['调频', '全国概览'],
+                        details: frequencyData.details?.[name]?.details || []
+                    };
+                });
+
+                energyProvinces.forEach(name => {
+                    if (!overviewValues[name]) {
+                        overviewValues[name] = 1;
+                        categoryMap[name] = 'energy';
+                        overviewDetails[name] = {
+                            title: `${name} ｜ 电能量省份`,
+                            totalVolume: energyData.details?.[name]?.totalVolume || energyData.displayMap?.[name] || '电能量热点',
+                            marketVolumeDisplay: energyData.details?.[name]?.marketVolumeDisplay || '电能量市场重点省份',
+                            tags: ['电能量', '全国概览'],
+                            details: energyData.details?.[name]?.details || []
+                        };
+                    }
+                });
+
+                return {
+                    mapValues: overviewValues,
+                    details: overviewDetails,
+                    categoryMap
+                };
+            }, [frequencyData, energyData]);
 
             // 资源禀赋动态视图
             const resourceMetrics = useMemo(() => {
@@ -656,11 +704,12 @@
 
             // --- 数据选择逻辑 ---
             const currentData = useMemo(() => {
+                if (marketType === 'overview') return overviewData;
                 if (marketType === 'frequency') return frequencyData;
                 if (energyView === 'spot-progress') return spotProgressData;
                 if (marketType === 'resource') return resourceData;
                 return energyData;
-            }, [marketType, energyView, resourceData]);
+            }, [marketType, energyView, resourceData, overviewData]);
 
             // --- 数据转换函数 ---
             const convertPointData = (data) => {
@@ -699,7 +748,17 @@
                 const values = currentData.mapValues || {};
 
                 Object.keys(values).forEach(name => {
-                    if (marketType === 'energy') {
+                    if (marketType === 'overview') {
+                        const category = currentData.categoryMap?.[name] || 'energy';
+                        const color = category === 'frequency' ? colorPalettes.overview.map[2] : colorPalettes.overview.map[1];
+                        data.push({
+                            name,
+                            value: values[name],
+                            itemStyle: { areaColor: color, borderColor: '#fff', borderWidth: 1.2 },
+                            emphasis: { itemStyle: { areaColor: currentPalette.highlight } },
+                            overviewCategory: category
+                        });
+                    } else if (marketType === 'energy') {
                         if (energyView === 'price') {
                             const category = energyData.categoryMap[name];
                             const color = getEnergyColor(values[name], category);
@@ -802,6 +861,11 @@
                             { value: -1, label: '第三梯队', color: '#e5e7eb' }
                         ];
 
+                        const overviewPieces = [
+                            { value: 2, label: '调频省份', color: colorPalettes.overview.map[2] },
+                            { value: 1, label: '电能量省份', color: colorPalettes.overview.map[1] }
+                        ];
+
                         option = {
                             backgroundColor: 'transparent',
                             grid: { left: '5%', right: '5%', top: '5%', bottom: '5%' },
@@ -810,6 +874,15 @@
                                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                     borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                     formatter: (params) => {
+                                    if (params.data?.overviewCategory) {
+                                        const label = params.data.overviewCategory === 'frequency' ? '调频省份' : '电能量省份';
+                                        const info = currentData.details?.[params.name];
+                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
+                                            + `<div style="font-size:12px; color:${params.data.overviewCategory === 'frequency' ? '#0ea5e9' : '#10b981'}; font-weight:700;">${label}</div>`
+                                            + (info?.marketVolumeDisplay ? `<div style=\"font-size:12px; color:#475569; margin-top:6px; line-height:1.6;\">${info.marketVolumeDisplay}</div>` : '')
+                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
+                                    }
+
                                     if (params.data?.spotProgressLevel !== undefined) {
                                         const level = params.data.spotProgressLevel;
                                         const remark = params.data.remark || currentData.remarkMap?.[params.name];
@@ -887,7 +960,11 @@
                                     return params.name;
                                 }
                             },
-                            ...(marketType === 'frequency' ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } } : {}),
+                            ...(marketType === 'frequency'
+                                ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } }
+                                : marketType === 'overview'
+                                    ? { visualMap: { show: true, left: '2%', bottom: '5%', type: 'piecewise', pieces: overviewPieces } }
+                                    : {}),
                             series: [{
                                 name: '市场分布',
                                 type: 'map',
@@ -978,7 +1055,7 @@
                         const clickedName = params.name;
                         if (adcodeMap[clickedName] && currentData.details[clickedName]) {
                             setCurrentProvince(clickedName);
-                            setSelectedProvinceInfo(currentData.details[clickedName]);
+                            setSelectedProvinceInfo(getUnifiedProvinceDetail(clickedName));
                             setSelectedProvinceName(clickedName);
                             setViewMode('province');
                         }
@@ -991,6 +1068,7 @@
             };
 
             const handleResourceApply = () => {
+                if (interactionMode !== 'edit') return;
                 if (!resourceInput.trim()) return;
                 const lines = resourceInput.split('\n').map(l => l.trim()).filter(Boolean);
                 if (!lines.length) return;
@@ -1023,6 +1101,7 @@
             };
 
             const handleGridUpload = (event) => {
+                if (interactionMode !== 'edit') return;
                 const files = Array.from(event.target.files || []);
                 if (!files.length) return;
                 if (!gridUploadProvince) {
@@ -1053,6 +1132,7 @@
             };
 
             const handleGridDelete = (province, id) => {
+                if (interactionMode !== 'edit') return;
                 setGridUploads(prev => {
                     const next = { ...prev };
                     const list = (next[province] || []).filter(item => item.id !== id);
@@ -1071,6 +1151,7 @@
             };
 
             const handleConfigExport = () => {
+                if (interactionMode !== 'edit') return;
                 const payload = {
                     resourceEndowment,
                     resourceLabels,
@@ -1087,6 +1168,7 @@
             };
 
             const handleConfigImport = (event) => {
+                if (interactionMode !== 'edit') return;
                 const file = event.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
@@ -1206,6 +1288,33 @@
                 return () => window.removeEventListener('resize', handlePieResize);
             }, []);
 
+            const getUnifiedProvinceDetail = (provinceName) => {
+                if (!provinceName) return null;
+                const frequencyInfo = frequencyData.details?.[provinceName];
+                const energyInfo = energyData.details?.[provinceName];
+                const spotInfo = spotProgressData.details?.[provinceName];
+                const resourceInfo = resourceData.details?.[provinceName];
+
+                const combinedDetails = [];
+                if (frequencyInfo) combinedDetails.push({ label: '二次调频', value: frequencyInfo.marketVolumeDisplay || frequencyInfo.totalVolume });
+                if (energyInfo) combinedDetails.push({ label: '电能量', value: energyInfo.marketVolumeDisplay || energyInfo.totalVolume });
+                if (spotInfo) combinedDetails.push({ label: '现货/政策', value: spotInfo.marketVolumeDisplay || '现货市场进展' });
+                if (resourceInfo) {
+                    combinedDetails.push({ label: '资源禀赋', value: resourceInfo.marketVolumeDisplay || resourceInfo.totalVolume });
+                }
+
+                const detailList = [...combinedDetails, ...(resourceInfo?.details || [])];
+
+                return {
+                    title: `${provinceName} 综合信息`,
+                    totalVolume: frequencyInfo?.totalVolume || energyInfo?.totalVolume || resourceInfo?.totalVolume || '综合侧栏',
+                    marketVolumeDisplay: '从任意视图进入省级视图时统一展示综合数据',
+                    tags: ['综合信息', '统一省级侧栏'],
+                    details: detailList,
+                    resourcePieData: resourceInfo?.resourcePieData
+                };
+            };
+
             const handleBack = () => {
                 setViewMode('china');
                 setCurrentProvince(null);
@@ -1221,33 +1330,39 @@
                 ? '调频收益概览'
                 : marketType === 'resource'
                     ? '资源禀赋概览'
-                    : energyView === 'price'
-                        ? '电能量市场概览'
-                        : '现货市场进程概览';
+                    : marketType === 'overview'
+                        ? '总体视图概览'
+                        : energyView === 'price'
+                            ? '电能量市场概览'
+                            : '现货市场进程概览';
 
             const detailProvinceName = selectedProvinceName || currentProvince;
             const provinceGridList = detailProvinceName && Array.isArray(gridUploads[detailProvinceName]) ? gridUploads[detailProvinceName] : [];
 
             const mainTitle = viewMode === 'province'
                 ? `${currentProvince}详情`
-                : (marketType === 'frequency'
-                    ? '二次调频市场热力图'
-                    : marketType === 'resource'
-                        ? '资源禀赋热力图'
-                        : energyViewTitle);
+                : (marketType === 'overview'
+                    ? '全国总体视图（调频 vs 电能量）'
+                    : marketType === 'frequency'
+                        ? '二次调频市场热力图'
+                        : marketType === 'resource'
+                            ? '资源禀赋热力图'
+                            : energyViewTitle);
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
-                    <div className="fixed left-3 bottom-3 z-50 flex flex-col gap-2">
-                        <button
-                            onClick={() => setShowArchivePanel(true)}
-                            className="w-11 h-11 rounded-xl bg-slate-900 text-white shadow-lg border border-slate-800 flex items-center justify-center hover:bg-slate-800 transition-all"
-                            title="导入/导出热力图存档"
-                        >
-                            <ArchiveIcon size={18} />
-                        </button>
-                        <span className="text-[10px] text-slate-500 text-center leading-tight">存档</span>
-                    </div>
+                    {interactionMode === 'edit' && (
+                        <div className="fixed left-3 bottom-3 z-50 flex flex-col gap-2">
+                            <button
+                                onClick={() => setShowArchivePanel(true)}
+                                className="w-11 h-11 rounded-xl bg-slate-900 text-white shadow-lg border border-slate-800 flex items-center justify-center hover:bg-slate-800 transition-all"
+                                title="导入/导出热力图存档"
+                            >
+                                <ArchiveIcon size={18} />
+                            </button>
+                            <span className="text-[10px] text-slate-500 text-center leading-tight">存档</span>
+                        </div>
+                    )}
 
                     {showArchivePanel && (
                         <div className="fixed inset-0 z-50 flex items-end justify-start bg-black/20" onClick={() => setShowArchivePanel(false)}>
@@ -1299,6 +1414,24 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div className="flex items-center gap-3 text-sm">
+                            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1 border border-slate-200">
+                                <button
+                                    onClick={() => setInteractionMode('view')}
+                                    className={`px-3 py-1 rounded-md text-xs font-bold ${interactionMode === 'view' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    查看模式
+                                </button>
+                                <button
+                                    onClick={() => setInteractionMode('edit')}
+                                    className={`px-3 py-1 rounded-md text-xs font-bold ${interactionMode === 'edit' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    编辑模式
+                                </button>
+                            </div>
+                            <span className="text-[11px] text-slate-500">{interactionMode === 'edit' ? '可导入图片并编辑全部字段' : '仅浏览与切换视图，禁用编辑入口'}</span>
+                        </div>
                     </header>
 
                     <div className="flex-1 relative w-full h-full overflow-hidden">
@@ -1317,6 +1450,12 @@
                                     
                                     {/* 0. 市场类型切换器 (核心功能) */}
                                     <div className="p-1 bg-slate-100 rounded-lg flex gap-1">
+                                        <button
+                                            onClick={() => setMarketType('overview')}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'overview' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <MapIcon size={14} /> 总体视图
+                                        </button>
                                         <button
                                             onClick={() => setMarketType('frequency')}
                                             className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1380,47 +1519,55 @@
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="text-[11px] text-slate-600 leading-relaxed bg-white/60 border border-emerald-100 rounded-md p-2">
-                                                任意指标都可成为热力图底层数据。输入“省份,指标,数值”可追加装机信息，支持多行批量导入。
-                                            </div>
-                                            <textarea
-                                                value={resourceInput}
-                                                onChange={(e) => setResourceInput(e.target.value)}
-                                                placeholder="示例: 河北省,风电,36.5\n甘肃省,光伏,42"
-                                                className="w-full h-20 text-sm rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                            ></textarea>
-                                            <button
-                                                onClick={handleResourceApply}
-                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-md shadow-sm"
-                                            >
-                                                应用资源录入
-                                            </button>
-                                            <div className="space-y-2 pt-1">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <label className="text-[11px] text-slate-600">上传网架/规划示意图 (图片)</label>
-                                                    <select
-                                                        value={gridUploadProvince}
-                                                        onChange={(e) => setGridUploadProvince(e.target.value)}
-                                                        className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            {interactionMode === 'edit' ? (
+                                                <>
+                                                    <div className="text-[11px] text-slate-600 leading-relaxed bg-white/60 border border-emerald-100 rounded-md p-2">
+                                                        任意指标都可成为热力图底层数据。输入“省份,指标,数值”可追加装机信息，支持多行批量导入。
+                                                    </div>
+                                                    <textarea
+                                                        value={resourceInput}
+                                                        onChange={(e) => setResourceInput(e.target.value)}
+                                                        placeholder="示例: 河北省,风电,36.5\n甘肃省,光伏,42"
+                                                        className="w-full h-20 text-sm rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                                    ></textarea>
+                                                    <button
+                                                        onClick={handleResourceApply}
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-md shadow-sm"
                                                     >
-                                                        {Object.keys(adcodeMap).map(name => (
-                                                            <option key={name} value={name}>{name}</option>
-                                                        ))}
-                                                    </select>
+                                                        应用资源录入
+                                                    </button>
+                                                    <div className="space-y-2 pt-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <label className="text-[11px] text-slate-600">上传网架/规划示意图 (图片)</label>
+                                                            <select
+                                                                value={gridUploadProvince}
+                                                                onChange={(e) => setGridUploadProvince(e.target.value)}
+                                                                className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                                            >
+                                                                {Object.keys(adcodeMap).map(name => (
+                                                                    <option key={name} value={name}>{name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <input type="file" multiple accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
+                                                        {gridPreview && (
+                                                            <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                                <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover" />
+                                                                <div className="text-[10px] text-slate-500 px-2 py-1">{gridUploadProvince || '未选择省份'} 已加载网架图，详情栏将自动展示</div>
+                                                            </div>
+                                                        )}
+                                                        {Object.keys(gridUploads).length > 0 && (
+                                                            <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
+                                                                已为 {Object.keys(gridUploads).join('、')} 保存 {Object.values(gridUploads).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0)} 张网架图
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-[11px] text-emerald-700 bg-white border border-emerald-100 rounded-md p-2">
+                                                    当前为查看模式，仅保留装机口径切换，编辑录入与图片上传已隐藏。
                                                 </div>
-                                                <input type="file" multiple accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
-                                                {gridPreview && (
-                                                    <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
-                                                        <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover" />
-                                                        <div className="text-[10px] text-slate-500 px-2 py-1">{gridUploadProvince || '未选择省份'} 已加载网架图，详情栏将自动展示</div>
-                                                    </div>
-                                                )}
-                                                {Object.keys(gridUploads).length > 0 && (
-                                                    <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-                                                        已为 {Object.keys(gridUploads).join('、')} 保存 {Object.values(gridUploads).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0)} 张网架图
-                                                    </div>
-                                                )}
-                                            </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -1647,14 +1794,21 @@
                                                     {provinceGridList.map(item => (
                                                         <div key={item.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
                                                             <div className="relative">
-                                                                <img src={item.src} alt={`${detailProvinceName} 网架示意图`} className="w-full h-48 object-cover" />
-                                                                <button
-                                                                    onClick={() => handleGridDelete(detailProvinceName, item.id)}
-                                                                    className="absolute top-2 right-2 bg-white/90 text-slate-600 hover:text-red-600 border border-slate-200 rounded-full p-1 shadow-sm"
-                                                                    title="删除此网架图"
-                                                                >
-                                                                    <X size={14} />
-                                                                </button>
+                                                                <img
+                                                                    src={item.src}
+                                                                    alt={`${detailProvinceName} 网架示意图`}
+                                                                    className="w-full h-48 object-cover cursor-pointer"
+                                                                    onClick={() => setPreviewImage({ src: item.src, alt: item.name || `${detailProvinceName} 网架示意图` })}
+                                                                />
+                                                                {interactionMode === 'edit' && (
+                                                                    <button
+                                                                        onClick={() => handleGridDelete(detailProvinceName, item.id)}
+                                                                        className="absolute top-2 right-2 bg-white/90 text-slate-600 hover:text-red-600 border border-slate-200 rounded-full p-1 shadow-sm"
+                                                                        title="删除此网架图"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                             <div className="text-[11px] text-slate-500 px-3 py-2 flex items-center justify-between">
                                                                 <span className="truncate" title={item.name || '自定义上传'}>{item.name || '自定义上传'}</span>
@@ -1686,6 +1840,19 @@
                             )}
                         </div>
                     </div>
+                    {previewImage && (
+                        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={() => setPreviewImage(null)}>
+                            <div className="bg-white rounded-xl shadow-2xl overflow-hidden max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
+                                    <span className="text-sm font-semibold text-slate-700">{previewImage.alt || '图片预览'}</span>
+                                    <button onClick={() => setPreviewImage(null)} className="text-slate-400 hover:text-slate-700"><X size={16} /></button>
+                                </div>
+                                <div className="max-h-[80vh] overflow-auto bg-slate-50">
+                                    <img src={previewImage.src} alt={previewImage.alt || '图片预览'} className="w-full h-full object-contain" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
