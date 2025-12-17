@@ -75,10 +75,6 @@
             const [gridUploads, setGridUploads] = useState({});
             const [gridUploadProvince, setGridUploadProvince] = useState('');
             const [showArchivePanel, setShowArchivePanel] = useState(false);
-            const [isEditMode, setIsEditMode] = useState(false);
-            const [editableContent, setEditableContent] = useState({});
-            const [lightboxImage, setLightboxImage] = useState(null);
-            const [chinaGeoJson, setChinaGeoJson] = useState(null);
 
             // --- 省份 Adcode 映射 ---
             const adcodeMap = {
@@ -120,33 +116,10 @@
                     highlight: '#f59e0b',
                     iconBg: 'bg-green-50', iconText: 'text-emerald-700', iconBorder: 'border-green-100',
                     gradientFrom: 'from-emerald-700', gradientTo: 'to-lime-300'
-                },
-                overview: {
-                    map: ['#e5e7eb', '#1d4ed8', '#a855f7', '#0ea5e9'],
-                    highlight: '#f59e0b',
-                    iconBg: 'bg-slate-100', iconText: 'text-slate-700', iconBorder: 'border-slate-200',
-                    gradientFrom: 'from-slate-700', gradientTo: 'to-slate-400'
                 }
             };
 
             const currentPalette = colorPalettes[marketType];
-
-            const getEditableValue = (id, fallback = '') => editableContent[id] ?? fallback ?? '';
-
-            const EditableText = ({ id, value, className = '', as = 'span', multiline = false }) => {
-                const Tag = as;
-                return (
-                    <Tag
-                        contentEditable={isEditMode}
-                        suppressContentEditableWarning
-                        onBlur={(e) => setEditableContent(prev => ({ ...prev, [id]: e.target.innerText }))}
-                        className={`${isEditMode ? 'outline outline-1 outline-dashed outline-blue-200 rounded-sm px-0.5 cursor-text' : ''} ${className}`}
-                        style={{ whiteSpace: multiline ? 'pre-wrap' : undefined }}
-                    >
-                        {getEditableValue(id, value)}
-                    </Tag>
-                );
-            };
 
             // 2. 点位类型配置
             const pointTypeConfig = {
@@ -400,48 +373,6 @@
             };
 
             const energyData = buildEnergyData();
-
-            const overviewRolePieces = [
-                { value: 3, label: '调频 + 电能量', color: '#0ea5e9' },
-                { value: 1, label: '调频省份', color: '#1d4ed8' },
-                { value: 2, label: '电能量省份', color: '#a855f7' }
-            ];
-
-            const provinceRoleData = useMemo(() => {
-                const frequencySet = new Set(Object.keys(frequencyData.mapValues || {}));
-                const energySet = new Set(Object.keys(energyData.mapValues || {}));
-
-                return Object.keys(adcodeMap).map(name => {
-                    let value = 0;
-                    if (frequencySet.has(name)) value += 1;
-                    if (energySet.has(name)) value += 2;
-                    return { name, value };
-                }).filter(item => item.value > 0);
-            }, [adcodeMap, energyData.mapValues, frequencyData.mapValues]);
-
-            const overviewData = useMemo(() => {
-                const mapValues = {};
-                const details = {};
-
-                const labelMap = {
-                    1: '调频省份',
-                    2: '电能量省份',
-                    3: '调频 + 电能量省份'
-                };
-
-                provinceRoleData.forEach(item => {
-                    mapValues[item.name] = item.value;
-                    const label = labelMap[item.value] || '已标注省份';
-                    details[item.name] = {
-                        title: `${item.name} 总体视图`,
-                        totalVolume: label,
-                        marketVolumeDisplay: `${label}，可切换具体视图查看不同市场指标。`,
-                        details: [{ label: '省份类型', value: label }]
-                    };
-                });
-
-                return { mapValues, details };
-            }, [provinceRoleData]);
 
             // 资源禀赋动态视图
             const resourceMetrics = useMemo(() => {
@@ -725,12 +656,11 @@
 
             // --- 数据选择逻辑 ---
             const currentData = useMemo(() => {
-                if (marketType === 'overview') return overviewData;
                 if (marketType === 'frequency') return frequencyData;
                 if (energyView === 'spot-progress') return spotProgressData;
                 if (marketType === 'resource') return resourceData;
                 return energyData;
-            }, [marketType, energyView, overviewData, resourceData]);
+            }, [marketType, energyView, resourceData]);
 
             // --- 数据转换函数 ---
             const convertPointData = (data) => {
@@ -769,16 +699,7 @@
                 const values = currentData.mapValues || {};
 
                 Object.keys(values).forEach(name => {
-                    if (marketType === 'overview') {
-                        const role = values[name];
-                        const roleColor = overviewRolePieces.find(p => p.value === role)?.color || currentPalette.map[0];
-                        data.push({
-                            name,
-                            value: role,
-                            itemStyle: { areaColor: roleColor, borderColor: '#fff', borderWidth: 1.2 },
-                            emphasis: { itemStyle: { areaColor: currentPalette.highlight } }
-                        });
-                    } else if (marketType === 'energy') {
+                    if (marketType === 'energy') {
                         if (energyView === 'price') {
                             const category = energyData.categoryMap[name];
                             const color = getEnergyColor(values[name], category);
@@ -837,32 +758,12 @@
                 return data;
             };
 
-            useEffect(() => {
-                const fetchChinaMap = async () => {
-                    if (chinaGeoJson) return;
-                    try {
-                        const response = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json');
-                        const geoJson = await response.json();
-                        setChinaGeoJson(geoJson);
-                        if (window.echarts) {
-                            window.echarts.registerMap('china', geoJson);
-                            window.echarts.registerMap('china-overview', geoJson);
-                        }
-                    } catch (error) {
-                        console.error('加载全国地图失败', error);
-                    }
-                };
-
-                fetchChinaMap();
-            }, [chinaGeoJson]);
-
             // --- 加载地图 ---
             const loadMap = async (mode, provinceName = null) => {
                 setLoading(true);
                 try {
                     let geoJsonUrl = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
                     let mapName = 'china';
-                    let geoJson = null;
 
                     if (mode === 'province' && provinceName) {
                         const adcode = adcodeMap[provinceName];
@@ -872,22 +773,12 @@
                         }
                     }
 
-                    if (mode === 'china' && chinaGeoJson) {
-                        geoJson = chinaGeoJson;
-                    } else {
-                        const response = await fetch(geoJsonUrl);
-                        geoJson = await response.json();
-                        if (mode === 'china') {
-                            setChinaGeoJson(geoJson);
-                        }
-                    }
-
+                    const response = await fetch(geoJsonUrl);
+                    const geoJson = await response.json();
+                    
                     if (!window.echarts) return;
-
+                    
                     window.echarts.registerMap(mapName, geoJson);
-                    if (mapName === 'china') {
-                        window.echarts.registerMap('china-overview', geoJson);
-                    }
                     
                     if (chartInstanceRef.current) {
                         chartInstanceRef.current.dispose();
@@ -944,14 +835,6 @@
                                             + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:6px;">🖱 双击进入省级地图</div>`;
                                     }
 
-                                    if (marketType === 'overview') {
-                                        const role = overviewRolePieces.find(p => p.value === params.data?.value);
-                                        const label = role?.label || '已标注省份';
-                                        return `<div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${params.name}</div>`
-                                            + `<div style="font-size:12px; color:#475569; margin-bottom:6px;">类型：<span style="font-weight:bold; color:${role?.color || '#475569'};">${label}</span></div>`
-                                            + `<div style="font-size:12px; color:#2563eb; font-weight:500; border-top:1px solid #f1f5f9; padding-top:4px;">🖱 双击进入省级地图</div>`;
-                                    }
-
                                     if (params.data?.energyCategory) {
                                         const categoryLabel = params.data.energyCategory === 'actual' ? '实测数据' : '市场区间';
                                         const display = energyData.displayMap[params.name] || params.value;
@@ -1004,11 +887,7 @@
                                     return params.name;
                                 }
                             },
-                            ...(marketType === 'frequency'
-                                ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } }
-                                : marketType === 'overview'
-                                    ? { visualMap: { type: 'piecewise', pieces: overviewRolePieces, orient: 'horizontal', bottom: 10, left: 'center', textStyle: { color: '#475569', fontSize: 11 } } }
-                                    : {}),
+                            ...(marketType === 'frequency' ? { visualMap: { show: false, type: 'piecewise', pieces: frequencyPieces } } : {}),
                             series: [{
                                 name: '市场分布',
                                 type: 'map',
@@ -1082,7 +961,7 @@
                         if (mode !== 'china') return;
                         if (params.componentType !== 'series' || params.seriesType !== 'map') return;
                         const clickedName = params.name;
-                        const provinceInfo = currentData.details?.[clickedName];
+                        const provinceInfo = currentData.details[clickedName];
                         if (provinceInfo) {
                             setSelectedProvinceInfo(provinceInfo);
                             setSelectedProvinceName(clickedName);
@@ -1097,10 +976,9 @@
                         if (mode !== 'china') return;
                         if (params.componentType !== 'series' || params.seriesType !== 'map') return;
                         const clickedName = params.name;
-                        const provinceInfo = buildUnifiedProvinceDetail(clickedName) || currentData.details?.[clickedName];
-                        if (adcodeMap[clickedName] && provinceInfo) {
+                        if (adcodeMap[clickedName] && currentData.details[clickedName]) {
                             setCurrentProvince(clickedName);
-                            setSelectedProvinceInfo(buildUnifiedProvinceDetail(clickedName));
+                            setSelectedProvinceInfo(currentData.details[clickedName]);
                             setSelectedProvinceName(clickedName);
                             setViewMode('province');
                         }
@@ -1113,10 +991,6 @@
             };
 
             const handleResourceApply = () => {
-                if (!isEditMode) {
-                    alert('请先切换到编辑模式再进行录入');
-                    return;
-                }
                 if (!resourceInput.trim()) return;
                 const lines = resourceInput.split('\n').map(l => l.trim()).filter(Boolean);
                 if (!lines.length) return;
@@ -1136,33 +1010,6 @@
                 setResourceInput('');
             };
 
-            const buildUnifiedProvinceDetail = (provinceName) => {
-                if (!provinceName) return null;
-                const sources = [
-                    frequencyData?.details?.[provinceName],
-                    energyData?.details?.[provinceName],
-                    spotProgressData?.details?.[provinceName],
-                    resourceData?.details?.[provinceName]
-                ].filter(Boolean);
-
-                if (!sources.length) return null;
-
-                const summaryTexts = sources
-                    .map(item => item.marketVolumeDisplay)
-                    .filter(Boolean);
-
-                const details = sources.flatMap(item => item.details || []);
-                const resourcePieData = sources.find(item => Array.isArray(item.resourcePieData))?.resourcePieData;
-
-                return {
-                    title: `${provinceName} 综合画像`,
-                    totalVolume: sources.find(item => item.totalVolume)?.totalVolume || summaryTexts[0] || '',
-                    marketVolumeDisplay: summaryTexts.join(' ｜ '),
-                    details,
-                    resourcePieData
-                };
-            };
-
             const normalizeGridUploads = (rawUploads = {}) => {
                 const normalized = {};
                 Object.entries(rawUploads || {}).forEach(([province, value]) => {
@@ -1176,11 +1023,6 @@
             };
 
             const handleGridUpload = (event) => {
-                if (!isEditMode) {
-                    alert('请先切换到编辑模式再导入图片');
-                    event.target.value = '';
-                    return;
-                }
                 const files = Array.from(event.target.files || []);
                 if (!files.length) return;
                 if (!gridUploadProvince) {
@@ -1211,10 +1053,6 @@
             };
 
             const handleGridDelete = (province, id) => {
-                if (!isEditMode) {
-                    alert('查看模式下无法删除，请先开启编辑');
-                    return;
-                }
                 setGridUploads(prev => {
                     const next = { ...prev };
                     const list = (next[province] || []).filter(item => item.id !== id);
@@ -1249,11 +1087,6 @@
             };
 
             const handleConfigImport = (event) => {
-                if (!isEditMode) {
-                    alert('请在编辑模式下导入配置');
-                    event.target.value = '';
-                    return;
-                }
                 const file = event.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
@@ -1301,26 +1134,6 @@
             // 监听变化
             useEffect(() => {
                 loadMap(viewMode, currentProvince);
-            }, [viewMode, currentProvince, marketType, energyView, resourceData]);
-
-            useEffect(() => {
-                if (viewMode === 'province' && currentProvince) {
-                    const provinceInfo = buildUnifiedProvinceDetail(currentProvince);
-                    if (provinceInfo) {
-                        setSelectedProvinceInfo(provinceInfo);
-                        setSelectedProvinceName(currentProvince);
-                    }
-                }
-            }, [viewMode, currentProvince, marketType, energyView, resourceData]);
-
-            useEffect(() => {
-                if (viewMode === 'province' && currentProvince) {
-                    const provinceInfo = buildUnifiedProvinceDetail(currentProvince);
-                    if (provinceInfo) {
-                        setSelectedProvinceInfo(provinceInfo);
-                        setSelectedProvinceName(currentProvince);
-                    }
-                }
             }, [viewMode, currentProvince, marketType, energyView, resourceData]);
 
             // 切换市场时重置视图
@@ -1404,18 +1217,24 @@
                 ? '电能量市场热力图'
                 : '现货市场进程热力图（含政策信息）';
 
+            const detailSummaryTitle = marketType === 'frequency'
+                ? '调频收益概览'
+                : marketType === 'resource'
+                    ? '资源禀赋概览'
+                    : energyView === 'price'
+                        ? '电能量市场概览'
+                        : '现货市场进程概览';
+
             const detailProvinceName = selectedProvinceName || currentProvince;
             const provinceGridList = detailProvinceName && Array.isArray(gridUploads[detailProvinceName]) ? gridUploads[detailProvinceName] : [];
 
             const mainTitle = viewMode === 'province'
                 ? `${currentProvince}详情`
-                : (marketType === 'overview'
-                    ? '总体视图'
-                    : marketType === 'frequency'
-                        ? '二次调频市场热力图'
-                        : marketType === 'resource'
-                            ? '资源禀赋热力图'
-                            : energyViewTitle);
+                : (marketType === 'frequency'
+                    ? '二次调频市场热力图'
+                    : marketType === 'resource'
+                        ? '资源禀赋热力图'
+                        : energyViewTitle);
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
@@ -1448,9 +1267,9 @@
                                     >
                                         导出配置
                                     </button>
-                                    <label className={`flex-1 bg-white border border-slate-200 text-slate-700 text-[12px] font-bold py-2 rounded-md shadow-sm text-center ${isEditMode ? 'cursor-pointer hover:border-slate-300 hover:bg-slate-50' : 'opacity-60 cursor-not-allowed'}`}>
+                                    <label className="flex-1 bg-white border border-slate-200 text-slate-700 text-[12px] font-bold py-2 rounded-md shadow-sm cursor-pointer hover:border-slate-300 hover:bg-slate-50 text-center">
                                         导入配置
-                                        <input type="file" accept="application/json" onChange={handleConfigImport} className="hidden" disabled={!isEditMode} />
+                                        <input type="file" accept="application/json" onChange={handleConfigImport} className="hidden" />
                                     </label>
                                 </div>
                                 <div className="text-[10px] text-slate-400">生成 energy-map-config.json 作为热力图档案，随时恢复当前修改。</div>
@@ -1470,8 +1289,8 @@
                                 </div>
                             )}
                             
-                                <div>
-                                <h1 className="text-xl font-bold text-slate-900 tracking-tight"><EditableText id="main-title" value={mainTitle} /></h1>
+                            <div>
+                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{mainTitle}</h1>
                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                                     <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${currentPalette.iconBg} ${currentPalette.iconText} ${currentPalette.iconBorder}`}>
                                         {viewMode === 'province' ? <MapIcon size={12} /> : <Zap size={12} fill="currentColor" />}
@@ -1479,18 +1298,6 @@
                                     </span>
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${isEditMode ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                                {isEditMode ? '编辑模式' : '查看模式'}
-                            </span>
-                            <button
-                                onClick={() => setIsEditMode(!isEditMode)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all border ${isEditMode ? 'bg-slate-900 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-                            >
-                                {isEditMode ? '退出编辑' : '进入编辑'}
-                            </button>
                         </div>
                     </header>
 
@@ -1509,28 +1316,22 @@
                                 <div className="p-4 overflow-y-auto flex-1 space-y-6">
                                     
                                     {/* 0. 市场类型切换器 (核心功能) */}
-                                    <div className="p-1 bg-slate-100 rounded-lg grid grid-cols-2 gap-1">
-                                        <button
-                                            onClick={() => setMarketType('overview')}
-                                            className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'overview' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            <MapIcon size={14} /> 总体视图
-                                        </button>
+                                    <div className="p-1 bg-slate-100 rounded-lg flex gap-1">
                                         <button
                                             onClick={() => setMarketType('frequency')}
-                                            className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'frequency' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             <Activity size={14} /> 二次调频
                                         </button>
                                         <button
                                             onClick={() => setMarketType('energy')}
-                                            className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'energy' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'energy' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             <BatteryCharging size={14} /> 电能量
                                         </button>
                                         <button
                                             onClick={() => setMarketType('resource')}
-                                            className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'resource' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 py-2 px-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${marketType === 'resource' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             <Layers size={14} /> 资源禀赋
                                         </button>
@@ -1579,59 +1380,52 @@
                                                     ))}
                                                 </select>
                                             </div>
-                                            {isEditMode && (
-                                                <>
-                                                    <div className="text-[11px] text-slate-600 leading-relaxed bg-white/60 border border-emerald-100 rounded-md p-2">
-                                                        任意指标都可成为热力图底层数据。输入“省份,指标,数值”可追加装机信息，支持多行批量导入。
-                                                    </div>
-                                                    <textarea
-                                                        value={resourceInput}
-                                                        onChange={(e) => setResourceInput(e.target.value)}
-                                                        placeholder="示例: 河北省,风电,36.5\n甘肃省,光伏,42"
-                                                        disabled={!isEditMode}
-                                                        className={`w-full h-20 text-sm rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300 ${!isEditMode ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                                    ></textarea>
-                                                    <button
-                                                        onClick={handleResourceApply}
-                                                        disabled={!isEditMode}
-                                                        className={`w-full text-xs font-bold py-2 rounded-md shadow-sm ${isEditMode ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-500 cursor-not-allowed'}`}
+                                            <div className="text-[11px] text-slate-600 leading-relaxed bg-white/60 border border-emerald-100 rounded-md p-2">
+                                                任意指标都可成为热力图底层数据。输入“省份,指标,数值”可追加装机信息，支持多行批量导入。
+                                            </div>
+                                            <textarea
+                                                value={resourceInput}
+                                                onChange={(e) => setResourceInput(e.target.value)}
+                                                placeholder="示例: 河北省,风电,36.5\n甘肃省,光伏,42"
+                                                className="w-full h-20 text-sm rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            ></textarea>
+                                            <button
+                                                onClick={handleResourceApply}
+                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-md shadow-sm"
+                                            >
+                                                应用资源录入
+                                            </button>
+                                            <div className="space-y-2 pt-1">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <label className="text-[11px] text-slate-600">上传网架/规划示意图 (图片)</label>
+                                                    <select
+                                                        value={gridUploadProvince}
+                                                        onChange={(e) => setGridUploadProvince(e.target.value)}
+                                                        className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                                     >
-                                                        应用资源录入
-                                                    </button>
-                                                    <div className="space-y-2 pt-1">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <label className="text-[11px] text-slate-600">上传网架/规划示意图 (图片)</label>
-                                                            <select
-                                                                value={gridUploadProvince}
-                                                                onChange={(e) => setGridUploadProvince(e.target.value)}
-                                                                disabled={!isEditMode}
-                                                                className={`rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 ${!isEditMode ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                                            >
-                                                                {Object.keys(adcodeMap).map(name => (
-                                                                    <option key={name} value={name}>{name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <input type="file" multiple accept="image/*" onChange={handleGridUpload} className="text-[11px]" disabled={!isEditMode} />
-                                                        {gridPreview && (
-                                                            <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
-                                                                <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover cursor-zoom-in" onClick={() => setLightboxImage(gridPreview)} />
-                                                                <div className="text-[10px] text-slate-500 px-2 py-1">{gridUploadProvince || '未选择省份'} 已加载网架图，详情栏将自动展示</div>
-                                                            </div>
-                                                        )}
-                                                        {Object.keys(gridUploads).length > 0 && (
-                                                            <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-                                                                已为 {Object.keys(gridUploads).join('、')} 保存 {Object.values(gridUploads).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0)} 张网架图
-                                                            </div>
-                                                        )}
+                                                        {Object.keys(adcodeMap).map(name => (
+                                                            <option key={name} value={name}>{name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <input type="file" multiple accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
+                                                {gridPreview && (
+                                                    <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                        <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover" />
+                                                        <div className="text-[10px] text-slate-500 px-2 py-1">{gridUploadProvince || '未选择省份'} 已加载网架图，详情栏将自动展示</div>
                                                     </div>
-                                                </>
-                                            )}
+                                                )}
+                                                {Object.keys(gridUploads).length > 0 && (
+                                                    <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
+                                                        已为 {Object.keys(gridUploads).join('、')} 保存 {Object.values(gridUploads).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0)} 张网架图
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 
                                     {/* 1. 收益/热度图例 */}
-                                    {viewMode === 'province' && marketType !== 'overview' && (
+                                    {viewMode === 'china' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                 {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : energyView === 'spot-progress' ? '现货市场进程热力图' : '电能量政策热力图')}
@@ -1746,28 +1540,26 @@
                                     <div className="border-t border-slate-100"></div>
 
                                     {/* 2. 能源基地类型图例 */}
-                                    {viewMode === 'province' && (
-                                        <div className="space-y-3">
-                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">能源基地图例</div>
-                                            <div className="space-y-2 text-xs text-slate-700">
-                                                {Object.entries(pointTypeConfig).map(([key, cfg]) => (
-                                                    <div key={key} className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
-                                                        {cfg.symbol === 'circle' && <div className="w-3 h-3 rounded-full border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
-                                                        {cfg.symbol === 'rect' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
-                                                        {cfg.symbol === 'triangle' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color, clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'}}></div>}
-                                                        {cfg.symbol === 'diamond' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0 rotate-45" style={{backgroundColor: cfg.color}}></div>}
-                                                        <span>{cfg.label}</span>
-                                                    </div>
-                                                ))}
-                                                <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
-                                                    <div className="w-8 h-3 bg-slate-300 rounded border border-white shadow-sm flex items-center justify-center relative flex-shrink-0">
-                                                        <div className="w-6 h-1 bg-slate-400/50 rounded-full"></div>
-                                                    </div>
-                                                    <span className="text-slate-500">走廊/产业带</span>
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">能源基地图例</div>
+                                        <div className="space-y-2 text-xs text-slate-700">
+                                            {Object.entries(pointTypeConfig).map(([key, cfg]) => (
+                                                <div key={key} className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
+                                                    {cfg.symbol === 'circle' && <div className="w-3 h-3 rounded-full border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
+                                                    {cfg.symbol === 'rect' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color}}></div>}
+                                                    {cfg.symbol === 'triangle' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0" style={{backgroundColor: cfg.color, clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'}}></div>}
+                                                    {cfg.symbol === 'diamond' && <div className="w-3 h-3 border border-white shadow-sm flex-shrink-0 rotate-45" style={{backgroundColor: cfg.color}}></div>}
+                                                    <span>{cfg.label}</span>
                                                 </div>
+                                            ))}
+                                            <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors">
+                                                <div className="w-8 h-3 bg-slate-300 rounded border border-white shadow-sm flex items-center justify-center relative flex-shrink-0">
+                                                    <div className="w-6 h-1 bg-slate-400/50 rounded-full"></div>
+                                                </div>
+                                                <span className="text-slate-500">走廊/产业带</span>
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
 
                                     {/* 3. 梯队信息 (仅调频显示) */}
                                     {marketType === 'frequency' && viewMode === 'china' && (
@@ -1792,60 +1584,21 @@
                                 </div>
                             </div>
 
-                            <button
+                            <button 
                                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                                 className={`absolute top-4 z-30 bg-white p-2 rounded-r-lg shadow-md border border-l-0 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all duration-300 ${isSidebarOpen ? 'left-72' : 'left-0'}`}
                             >
                                 {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                             </button>
 
-                            <div className="flex-1 relative p-4 flex flex-col gap-4">
-                                <div className="flex items-center flex-wrap gap-3 text-sm text-slate-600">
-                                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                                        {['overview', 'frequency', 'energy', 'resource'].map(key => (
-                                            <button
-                                                key={key}
-                                                onClick={() => setMarketType(key)}
-                                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-all ${marketType === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-                                            >
-                                                {key === 'overview' && '总体视图'}
-                                                {key === 'frequency' && '二次调频'}
-                                                {key === 'energy' && '电能量'}
-                                                {key === 'resource' && '资源禀赋'}
-                                            </button>
-                                        ))}
+                            <div className="flex-1 relative">
+                                {loading && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 bg-slate-50 z-50">
+                                        <div className="w-8 h-8 border-4 border-current border-t-transparent rounded-full animate-spin text-blue-500"></div>
+                                        <span className="text-sm">正在重绘地图...</span>
                                     </div>
-                                    <span className="text-[12px] text-slate-500">单击查看当前视图明细，双击进入省级小地图后展示综合信息。</span>
-                                </div>
-
-                                <div className="flex-1 relative bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[560px]">
-                                    {loading && (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 bg-white/70 backdrop-blur-sm z-50">
-                                            <div className="w-8 h-8 border-4 border-current border-t-transparent rounded-full animate-spin text-blue-500"></div>
-                                            <span className="text-sm">正在重绘地图...</span>
-                                        </div>
-                                    )}
-
-                                    <div className="absolute top-4 left-4 z-20">
-                                        <div className="flex items-center gap-1 bg-slate-50/90 border border-slate-200 rounded-2xl shadow-sm px-2 py-1">
-                                            {['overview', 'frequency', 'energy', 'resource'].map(key => (
-                                                <button
-                                                    key={`pill-${key}`}
-                                                    onClick={() => setMarketType(key)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${marketType === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                                >
-                                                    {key === 'overview' && '总体视图'}
-                                                    {key === 'frequency' && '二次调频'}
-                                                    {key === 'energy' && '电能量'}
-                                                    {key === 'resource' && '资源禀赋'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="absolute top-4 right-4 z-20 text-[12px] text-slate-500 bg-white/80 rounded-full px-3 py-1 border border-slate-200 shadow-sm">双击省份进入省级视图</div>
-                                    <div ref={mapContainerRef} className="w-full h-full cursor-pointer" />
-                                </div>
+                                )}
+                                <div ref={mapContainerRef} className="w-full h-full cursor-pointer" />
                             </div>
                         </div>
 
@@ -1855,10 +1608,11 @@
                                 <>
                                     <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-br from-slate-50 to-white">
                                         <div>
-                                            <div className="flex items-center gap-2 mb-1"><h2 className="text-2xl font-bold text-slate-800"><EditableText id={`province-title-${detailProvinceName || 'unknown'}`} value={selectedProvinceInfo.title} /></h2></div>
-                                            {selectedProvinceInfo.totalVolume && (
-                                                <div className="text-sm text-slate-600 mt-1"><EditableText id={`province-volume-${detailProvinceName || 'unknown'}`} value={selectedProvinceInfo.totalVolume} /></div>
-                                            )}
+                                            <div className="flex items-center gap-2 mb-1"><h2 className="text-2xl font-bold text-slate-800">{selectedProvinceInfo.title}</h2></div>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {selectedProvinceInfo.totalVolume && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${marketType === 'frequency' ? 'bg-blue-100 text-blue-700 border-blue-200' : marketType === 'resource' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>总量: {selectedProvinceInfo.totalVolume}</span>}
+                                                {selectedProvinceInfo.tags && selectedProvinceInfo.tags.map((tag, i) => <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">{tag}</span>)}
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => {
@@ -1870,9 +1624,13 @@
                                     </div>
                                     <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
                                         {/* 动态卡片颜色 */}
-                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : marketType === 'resource' ? 'bg-white border-emerald-100 shadow-emerald-50/50' : marketType === 'overview' ? 'bg-white border-slate-200 shadow-slate-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
-                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : marketType === 'resource' ? 'from-emerald-50' : marketType === 'overview' ? 'from-slate-50' : 'from-indigo-50'}`}></div>}
-                                            <p className="text-lg text-slate-800 font-medium leading-relaxed"><EditableText id={`province-summary-${detailProvinceName || 'unknown'}`} value={selectedProvinceInfo.marketVolumeDisplay} multiline /></p>
+                                        <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : marketType === 'resource' ? 'bg-white border-emerald-100 shadow-emerald-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
+                                            {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : marketType === 'resource' ? 'from-emerald-50' : 'from-indigo-50'}`}></div>}
+                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-blue-700' : marketType === 'resource' ? 'text-emerald-700' : 'text-indigo-600'}`}>
+                                                {marketType === 'frequency' ? <Coins size={20} /> : marketType === 'resource' ? <Layers size={20} /> : <Zap size={20} />}
+                                                <span>{detailSummaryTitle}</span>
+                                            </div>
+                                            <p className="text-lg text-slate-800 font-medium leading-relaxed">{selectedProvinceInfo.marketVolumeDisplay}</p>
                                         </div>
 
                                         {selectedProvinceInfo.resourcePieData && (
@@ -1889,16 +1647,10 @@
                                                     {provinceGridList.map(item => (
                                                         <div key={item.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
                                                             <div className="relative">
-                                                                <img
-                                                                    src={item.src}
-                                                                    alt={`${detailProvinceName} 网架示意图`}
-                                                                    className="w-full h-48 object-cover cursor-zoom-in"
-                                                                    onClick={() => setLightboxImage(item.src)}
-                                                                />
+                                                                <img src={item.src} alt={`${detailProvinceName} 网架示意图`} className="w-full h-48 object-cover" />
                                                                 <button
                                                                     onClick={() => handleGridDelete(detailProvinceName, item.id)}
-                                                                    disabled={!isEditMode}
-                                                                    className={`absolute top-2 right-2 bg-white/90 text-slate-600 border border-slate-200 rounded-full p-1 shadow-sm ${isEditMode ? 'hover:text-red-600' : 'opacity-60 cursor-not-allowed'}`}
+                                                                    className="absolute top-2 right-2 bg-white/90 text-slate-600 hover:text-red-600 border border-slate-200 rounded-full p-1 shadow-sm"
                                                                     title="删除此网架图"
                                                                 >
                                                                     <X size={14} />
@@ -1922,8 +1674,8 @@
                                                 <div className="bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100">
                                                     {selectedProvinceInfo.details.map((item, idx) => (
                                                         <div key={idx} className="p-4 flex flex-col gap-1.5 hover:bg-slate-50/80 transition-colors">
-                                                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-slate-400"></span><EditableText id={`province-detail-label-${detailProvinceName || 'unknown'}-${idx}`} value={item.label} /></span>
-                                                            <span className="text-slate-900 text-sm leading-relaxed pl-2 border-l-2 border-slate-200"><EditableText id={`province-detail-value-${detailProvinceName || 'unknown'}-${idx}`} value={item.value} multiline /></span>
+                                                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-slate-400"></span>{item.label}</span>
+                                                            <span className="text-slate-900 text-sm leading-relaxed pl-2 border-l-2 border-slate-200">{item.value}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1933,20 +1685,6 @@
                                 </>
                             )}
                         </div>
-
-                        {lightboxImage && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setLightboxImage(null)}>
-                                <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[85vh] p-4" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="text-sm font-semibold text-slate-800">图片预览（点击外侧关闭）</span>
-                                        <button className="text-slate-500 hover:text-slate-800" onClick={() => setLightboxImage(null)}><X size={16} /></button>
-                                    </div>
-                                    <div className="w-full h-[70vh]">
-                                        <img src={lightboxImage} alt="预览" className="w-full h-full object-contain" />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             );
