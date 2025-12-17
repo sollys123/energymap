@@ -1027,7 +1027,7 @@
                         if (mode !== 'china') return;
                         if (params.componentType !== 'series' || params.seriesType !== 'map') return;
                         const clickedName = params.name;
-                        const provinceInfo = currentData.details[clickedName];
+                        const provinceInfo = buildUnifiedProvinceDetail(clickedName) || currentData.details[clickedName];
                         if (provinceInfo) {
                             setSelectedProvinceInfo(provinceInfo);
                             setSelectedProvinceName(clickedName);
@@ -1042,9 +1042,10 @@
                         if (mode !== 'china') return;
                         if (params.componentType !== 'series' || params.seriesType !== 'map') return;
                         const clickedName = params.name;
-                        if (adcodeMap[clickedName] && currentData.details[clickedName]) {
+                        const provinceInfo = buildUnifiedProvinceDetail(clickedName) || currentData.details[clickedName];
+                        if (adcodeMap[clickedName] && provinceInfo) {
                             setCurrentProvince(clickedName);
-                            setSelectedProvinceInfo(currentData.details[clickedName]);
+                            setSelectedProvinceInfo(provinceInfo);
                             setSelectedProvinceName(clickedName);
                             setViewMode('province');
                         }
@@ -1078,6 +1079,33 @@
                     return next;
                 });
                 setResourceInput('');
+            };
+
+            const buildUnifiedProvinceDetail = (provinceName) => {
+                if (!provinceName) return null;
+                const sources = [
+                    frequencyData?.details?.[provinceName],
+                    energyData?.details?.[provinceName],
+                    spotProgressData?.details?.[provinceName],
+                    resourceData?.details?.[provinceName]
+                ].filter(Boolean);
+
+                if (!sources.length) return null;
+
+                const summaryTexts = sources
+                    .map(item => item.marketVolumeDisplay)
+                    .filter(Boolean);
+
+                const details = sources.flatMap(item => item.details || []);
+                const resourcePieData = sources.find(item => Array.isArray(item.resourcePieData))?.resourcePieData;
+
+                return {
+                    title: `${provinceName} 综合画像`,
+                    totalVolume: sources.find(item => item.totalVolume)?.totalVolume || summaryTexts[0] || '',
+                    marketVolumeDisplay: summaryTexts.join(' ｜ '),
+                    details,
+                    resourcePieData
+                };
             };
 
             const normalizeGridUploads = (rawUploads = {}) => {
@@ -1297,6 +1325,16 @@
                 loadMap(viewMode, currentProvince);
             }, [viewMode, currentProvince, marketType, energyView, resourceData]);
 
+            useEffect(() => {
+                if (viewMode === 'province' && currentProvince) {
+                    const provinceInfo = buildUnifiedProvinceDetail(currentProvince);
+                    if (provinceInfo) {
+                        setSelectedProvinceInfo(provinceInfo);
+                        setSelectedProvinceName(currentProvince);
+                    }
+                }
+            }, [viewMode, currentProvince, marketType, energyView, resourceData]);
+
             // 切换市场时重置视图
             useEffect(() => {
                 setViewMode('china');
@@ -1377,14 +1415,6 @@
             const energyViewTitle = energyView === 'price'
                 ? '电能量市场热力图'
                 : '现货市场进程热力图（含政策信息）';
-
-            const detailSummaryTitle = marketType === 'frequency'
-                ? '调频收益概览'
-                : marketType === 'resource'
-                    ? '资源禀赋概览'
-                    : energyView === 'price'
-                        ? '电能量市场概览'
-                        : '现货市场进程概览';
 
             const detailProvinceName = selectedProvinceName || currentProvince;
             const provinceGridList = detailProvinceName && Array.isArray(gridUploads[detailProvinceName]) ? gridUploads[detailProvinceName] : [];
@@ -1605,7 +1635,7 @@
                                     )}
 
                                     {/* 1. 收益/热度图例 */}
-                                    {viewMode === 'china' && (
+                                    {viewMode === 'province' && (
                                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-500">
                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                 {marketType === 'frequency' ? '调频收益 (热度)' : (energyView === 'price' ? '电能量价差热力图' : energyView === 'spot-progress' ? '现货市场进程热力图' : '电能量政策热力图')}
@@ -1827,10 +1857,6 @@
                                         {/* 动态卡片颜色 */}
                                         <div className={`rounded-xl p-5 border shadow-sm relative overflow-hidden ${marketType === 'frequency' ? 'bg-white border-blue-100 shadow-blue-50/50' : marketType === 'resource' ? 'bg-white border-emerald-100 shadow-emerald-50/50' : 'bg-white border-indigo-100 shadow-indigo-50/50'}`}>
                                             {selectedProvinceInfo.heatValue > 0 && <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl -mr-4 -mt-4 rounded-full opacity-50 ${marketType === 'frequency' ? 'from-blue-50' : marketType === 'resource' ? 'from-emerald-50' : 'from-indigo-50'}`}></div>}
-                                            <div className={`flex items-center gap-2 font-semibold mb-3 ${marketType === 'frequency' ? 'text-blue-700' : marketType === 'resource' ? 'text-emerald-700' : 'text-indigo-600'}`}>
-                                                {marketType === 'frequency' ? <Coins size={20} /> : marketType === 'resource' ? <Layers size={20} /> : <Zap size={20} />}
-                                                <span>{detailSummaryTitle}</span>
-                                            </div>
                                             <p className="text-lg text-slate-800 font-medium leading-relaxed"><EditableText id={`province-summary-${detailProvinceName || 'unknown'}`} value={selectedProvinceInfo.marketVolumeDisplay} multiline /></p>
                                         </div>
 
