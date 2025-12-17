@@ -47,6 +47,13 @@
         const MapIcon = (props) => (<IconWrapper {...props}><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></IconWrapper>);
         const ChevronLeft = (props) => (<IconWrapper {...props}><path d="m15 18-6-6 6-6"/></IconWrapper>);
         const ChevronRight = (props) => (<IconWrapper {...props}><path d="m9 18 6-6-6-6"/></IconWrapper>);
+        const ArchiveIcon = (props) => (
+            <IconWrapper {...props}>
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <path d="M6 8v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+                <path d="M10 12h4" />
+            </IconWrapper>
+        );
         const Layers = (props) => (<IconWrapper {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></IconWrapper>);
         const BatteryCharging = (props) => (<IconWrapper {...props}><path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19"/><line x1="23" x2="23" y1="13" y2="11"/><polyline points="11 6 7 12 13 12 9 18"/></IconWrapper>);
 
@@ -67,6 +74,7 @@
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
             const [gridUploads, setGridUploads] = useState({});
             const [gridUploadProvince, setGridUploadProvince] = useState('');
+            const [showArchivePanel, setShowArchivePanel] = useState(false);
 
             // --- 省份 Adcode 映射 ---
             const adcodeMap = {
@@ -954,24 +962,64 @@
                 setResourceInput('');
             };
 
+            const normalizeGridUploads = (rawUploads = {}) => {
+                const normalized = {};
+                Object.entries(rawUploads || {}).forEach(([province, value]) => {
+                    if (Array.isArray(value)) {
+                        normalized[province] = value;
+                    } else if (value?.src) {
+                        normalized[province] = [{ ...value, id: value.id || `${province}-${value.name || 'grid'}-${value.updatedAt || Date.now()}` }];
+                    }
+                });
+                return normalized;
+            };
+
             const handleGridUpload = (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
+                const files = Array.from(event.target.files || []);
+                if (!files.length) return;
                 if (!gridUploadProvince) {
                     alert('请先选择要归属的省份');
                     return;
                 }
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const src = e.target.result;
-                    setGridUploads(prev => ({
-                        ...prev,
-                        [gridUploadProvince]: { src, name: file.name, updatedAt: new Date().toISOString() }
-                    }));
-                    setGridPreview(src);
-                };
-                reader.readAsDataURL(file);
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const src = e.target.result;
+                        setGridUploads(prev => {
+                            const next = { ...prev };
+                            const list = Array.isArray(next[gridUploadProvince]) ? [...next[gridUploadProvince]] : [];
+                            list.push({
+                                id: `${file.name}-${Date.now()}`,
+                                src,
+                                name: file.name,
+                                updatedAt: new Date().toISOString()
+                            });
+                            next[gridUploadProvince] = list;
+                            return next;
+                        });
+                        setGridPreview(src);
+                    };
+                    reader.readAsDataURL(file);
+                });
                 event.target.value = '';
+            };
+
+            const handleGridDelete = (province, id) => {
+                setGridUploads(prev => {
+                    const next = { ...prev };
+                    const list = (next[province] || []).filter(item => item.id !== id);
+                    if (list.length) {
+                        next[province] = list;
+                    } else {
+                        delete next[province];
+                    }
+
+                    if (province === gridUploadProvince) {
+                        setGridPreview(list[list.length - 1]?.src || null);
+                    }
+
+                    return next;
+                });
             };
 
             const handleConfigExport = () => {
@@ -1000,12 +1048,13 @@
                         if (json.resourceEndowment) setResourceEndowment(json.resourceEndowment);
                         if (json.resourceLabels) setResourceLabels(prev => ({ ...prev, ...json.resourceLabels }));
                         if (json.resourceMetric) setResourceMetric(json.resourceMetric);
-                        if (json.gridUploads) setGridUploads(json.gridUploads);
+                        if (json.gridUploads) setGridUploads(normalizeGridUploads(json.gridUploads));
 
                         const importedProvince = json.gridUploads ? Object.keys(json.gridUploads)[0] : '';
                         if (importedProvince) {
                             setGridUploadProvince(importedProvince);
-                            setGridPreview(json.gridUploads[importedProvince]?.src || null);
+                            const importedList = normalizeGridUploads(json.gridUploads)[importedProvince] || [];
+                            setGridPreview(importedList[importedList.length - 1]?.src || null);
                         }
                     } catch (error) {
                         console.error('导入失败', error);
@@ -1030,7 +1079,8 @@
                     setGridPreview(null);
                     return;
                 }
-                setGridPreview(gridUploads[gridUploadProvince]?.src || null);
+                const provinceGrids = Array.isArray(gridUploads[gridUploadProvince]) ? gridUploads[gridUploadProvince] : [];
+                setGridPreview(provinceGrids[provinceGrids.length - 1]?.src || null);
             }, [gridUploadProvince, gridUploads]);
 
             // 监听变化
@@ -1081,6 +1131,7 @@
                     pieInstanceRef.current = echarts.init(pieContainerRef.current);
                 }
 
+                pieInstanceRef.current.clear();
                 pieInstanceRef.current.setOption({
                     tooltip: { trigger: 'item' },
                     legend: { show: false },
@@ -1093,7 +1144,19 @@
                         data: selectedProvinceInfo.resourcePieData
                     }]
                 });
+
+                pieInstanceRef.current.resize();
             }, [selectedProvinceInfo]);
+
+            useEffect(() => {
+                const handlePieResize = () => {
+                    if (pieInstanceRef.current) {
+                        pieInstanceRef.current.resize();
+                    }
+                };
+                window.addEventListener('resize', handlePieResize);
+                return () => window.removeEventListener('resize', handlePieResize);
+            }, []);
 
             const handleBack = () => {
                 setViewMode('china');
@@ -1115,6 +1178,7 @@
                         : '现货市场进程概览';
 
             const detailProvinceName = selectedProvinceName || currentProvince;
+            const provinceGridList = detailProvinceName && Array.isArray(gridUploads[detailProvinceName]) ? gridUploads[detailProvinceName] : [];
 
             const mainTitle = viewMode === 'province'
                 ? `${currentProvince}详情`
@@ -1126,6 +1190,45 @@
 
             return (
                 <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">
+                    <div className="fixed left-3 bottom-3 z-50 flex flex-col gap-2">
+                        <button
+                            onClick={() => setShowArchivePanel(true)}
+                            className="w-11 h-11 rounded-xl bg-slate-900 text-white shadow-lg border border-slate-800 flex items-center justify-center hover:bg-slate-800 transition-all"
+                            title="导入/导出热力图存档"
+                        >
+                            <ArchiveIcon size={18} />
+                        </button>
+                        <span className="text-[10px] text-slate-500 text-center leading-tight">存档</span>
+                    </div>
+
+                    {showArchivePanel && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-start bg-black/20" onClick={() => setShowArchivePanel(false)}>
+                            <div
+                                className="pointer-events-auto bg-white border border-slate-200 rounded-2xl shadow-2xl m-4 p-4 w-80 space-y-3"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm"><ArchiveIcon size={16} />热力图存档</div>
+                                    <button onClick={() => setShowArchivePanel(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                                </div>
+                                <p className="text-[11px] text-slate-600 leading-relaxed">上传的网架图和资源录入会被一并保存，导出后可直接发给同事或下次导入继续编辑。</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleConfigExport}
+                                        className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-[12px] font-bold py-2 rounded-md shadow-sm"
+                                    >
+                                        导出配置
+                                    </button>
+                                    <label className="flex-1 bg-white border border-slate-200 text-slate-700 text-[12px] font-bold py-2 rounded-md shadow-sm cursor-pointer hover:border-slate-300 hover:bg-slate-50 text-center">
+                                        导入配置
+                                        <input type="file" accept="application/json" onChange={handleConfigImport} className="hidden" />
+                                    </label>
+                                </div>
+                                <div className="text-[10px] text-slate-400">生成 energy-map-config.json 作为热力图档案，随时恢复当前修改。</div>
+                            </div>
+                        </div>
+                    )}
+
                     <header className="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10 shrink-0 relative">
                         <div className="flex items-center space-x-3">
                             {viewMode === 'province' ? (
@@ -1257,7 +1360,7 @@
                                                         ))}
                                                     </select>
                                                 </div>
-                                                <input type="file" accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
+                                                <input type="file" multiple accept="image/*" onChange={handleGridUpload} className="text-[11px]" />
                                                 {gridPreview && (
                                                     <div className="border border-emerald-100 rounded-lg overflow-hidden bg-white shadow-sm">
                                                         <img src={gridPreview} alt="网架预览" className="w-full h-24 object-cover" />
@@ -1266,34 +1369,12 @@
                                                 )}
                                                 {Object.keys(gridUploads).length > 0 && (
                                                     <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-                                                        已为 {Object.keys(gridUploads).join('、')} 保存网架图
+                                                        已为 {Object.keys(gridUploads).join('、')} 保存 {Object.values(gridUploads).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0)} 张网架图
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                     )}
-
-                                    <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm space-y-2">
-                                        <div className="text-[11px] text-slate-700 font-semibold flex items-center gap-2">
-                                            <Layers size={12} /> 热力图存档 / 导入导出
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                                            上传的网架图和资源录入会被一并保存，导出后可直接发给同事或下次导入继续编辑。
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleConfigExport}
-                                                className="flex-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold py-2 rounded-md shadow-sm"
-                                            >
-                                                导出配置
-                                            </button>
-                                            <label className="flex-1 bg-white border border-slate-200 text-slate-700 text-[11px] font-bold py-2 rounded-md shadow-sm cursor-pointer hover:border-slate-300 hover:bg-slate-50 text-center">
-                                                导入配置
-                                                <input type="file" accept="application/json" onChange={handleConfigImport} className="hidden" />
-                                            </label>
-                                        </div>
-                                        <div className="text-[10px] text-slate-400">生成 energy-map-config.json 作为热力图档案，随时恢复当前修改。</div>
-                                    </div>
 
                                     {/* 1. 收益/热度图例 */}
                                     {viewMode === 'china' && (
@@ -1511,17 +1592,30 @@
                                             </div>
                                         )}
 
-                                        {detailProvinceName && gridUploads[detailProvinceName]?.src && (
-                                            <div className="space-y-2">
+                                        {detailProvinceName && provinceGridList.length > 0 && (
+                                            <div className="space-y-3">
                                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider"><Layers size={14} />网架/规划示意图</div>
-                                                <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-                                                    <img src={gridUploads[detailProvinceName].src} alt={`${detailProvinceName} 网架示意图`} className="w-full h-56 object-cover" />
-                                                    <div className="text-[11px] text-slate-500 px-3 py-2 flex items-center justify-between">
-                                                        <span>{gridUploads[detailProvinceName].name || '自定义上传'}</span>
-                                                        {gridUploads[detailProvinceName].updatedAt && (
-                                                            <span className="text-[10px] text-slate-400">更新时间: {new Date(gridUploads[detailProvinceName].updatedAt).toLocaleString('zh-CN', { hour12: false })}</span>
-                                                        )}
-                                                    </div>
+                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                    {provinceGridList.map(item => (
+                                                        <div key={item.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                                                            <div className="relative">
+                                                                <img src={item.src} alt={`${detailProvinceName} 网架示意图`} className="w-full h-48 object-cover" />
+                                                                <button
+                                                                    onClick={() => handleGridDelete(detailProvinceName, item.id)}
+                                                                    className="absolute top-2 right-2 bg-white/90 text-slate-600 hover:text-red-600 border border-slate-200 rounded-full p-1 shadow-sm"
+                                                                    title="删除此网架图"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-500 px-3 py-2 flex items-center justify-between">
+                                                                <span className="truncate" title={item.name || '自定义上传'}>{item.name || '自定义上传'}</span>
+                                                                {item.updatedAt && (
+                                                                    <span className="text-[10px] text-slate-400">更新时间: {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         )}
