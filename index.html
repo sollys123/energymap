@@ -62,6 +62,7 @@
             name: '甘肃',
             title: '甘肃',
             kpis: [
+                { label: '调频总额', value: '2500-2600 万元/月（连涨中）' },
                 { label: '现货价差(均值)', value: '0.253 元/kWh' },
                 { label: '调频上限', value: '15 元/MW' },
                 { label: '容量电价', value: '330 元/kW·年（执行2年）' }
@@ -79,10 +80,38 @@
                         '装机概况：截至 2025 年 9 月，全口径装机容量 11612.75 万 kW；风光装机占比约 61%',
                         '新能源分布：河西走廊地区（张掖、武威、金昌）优势明显；日照时间长、强度高、戈壁大漠适合大型基地；风力强劲且稳定',
                         '负荷与调峰：2024 年全社会用电量 1746.33 亿 kWh；最大用电负荷 2395 万 kW；峰谷差 400–500 万 kW；最大调峰缺口超 1000 万 kW'
-                    ]
+                    ],
+                    capacityData: {
+                        title: '装机容量结构（万千瓦）',
+                        headers: ['电源类型', '装机容量', '占比'],
+                        rows: [
+                            { type: '火电', capacity: '3150.21', share: '27.13%' },
+                            { type: '水电', capacity: '971.61', share: '8.37%' },
+                            { type: '风电', capacity: '3780.80', share: '32.56%' },
+                            { type: '太阳能', capacity: '3710.13', share: '31.95%' },
+                            { type: '储能', capacity: '659.48', share: '-' }
+                        ],
+                        pie: [
+                            { name: '火电', value: 3150.21 },
+                            { name: '水电', value: 971.61 },
+                            { name: '风电', value: 3780.8 },
+                            { name: '太阳能', value: 3710.13 },
+                            { name: '储能', value: 659.48 }
+                        ],
+                        note: '数据来源：甘肃电力交易中心披露的装机容量结构'
+                    }
                 },
                 {
                     key: 'B',
+                    title: '现货市场进程',
+                    type: 'list',
+                    items: [
+                        '2021年5月：开展连续不间断结算试运行，形成现货交易规则雏形',
+                        '2024年9月5日：转入正式运行，标志着现货市场常态化落地'
+                    ]
+                },
+                {
+                    key: 'C',
                     title: '现货电价（1-7月统计）',
                     type: 'keyValue',
                     items: [
@@ -94,7 +123,7 @@
                     ]
                 },
                 {
-                    key: 'C',
+                    key: 'D',
                     title: '调频（辅助服务）',
                     type: 'sections',
                     sections: [
@@ -118,7 +147,7 @@
                     ]
                 },
                 {
-                    key: 'D',
+                    key: 'E',
                     title: '容量电价',
                     type: 'keyValue',
                     items: [
@@ -132,7 +161,7 @@
                     ]
                 },
                 {
-                    key: 'E',
+                    key: 'F',
                     title: '收益 & 财务（100MW/400MWh）',
                     type: 'finance',
                     table: {
@@ -164,6 +193,8 @@
             const [jsonValue, setJsonValue] = useState(JSON.stringify(baseData, null, 2));
             const [jsonError, setJsonError] = useState('');
             const [openStates, setOpenStates] = useState(() => buildAccordionState(baseData?.accordions));
+            const capacityPieRef = useRef(null);
+            const capacityPieInstanceRef = useRef(null);
 
             useEffect(() => {
                 setData(baseData);
@@ -174,6 +205,54 @@
             useEffect(() => {
                 setJsonValue(JSON.stringify(data, null, 2));
             }, [data]);
+
+            useEffect(() => {
+                const capacityAccordion = (data.accordions || []).find((accordion) => accordion.capacityData);
+                if (!capacityAccordion || !capacityPieRef.current) return;
+
+                const isAccordionOpen = openStates?.[capacityAccordion.key];
+                if (!isAccordionOpen) {
+                    if (capacityPieInstanceRef.current) {
+                        capacityPieInstanceRef.current.dispose();
+                        capacityPieInstanceRef.current = null;
+                    }
+                    return;
+                }
+
+                const pieData = (capacityAccordion.capacityData?.pie || []).map((item) => ({
+                    name: item.name,
+                    value: Number(item.value) || 0
+                }));
+
+                if (!capacityPieInstanceRef.current) {
+                    capacityPieInstanceRef.current = echarts.init(capacityPieRef.current);
+                }
+
+                capacityPieInstanceRef.current.setOption({
+                    tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
+                    legend: { show: true, top: 0, textStyle: { color: '#334155', fontSize: 12 } },
+                    series: [
+                        {
+                            name: '装机结构',
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+                            label: { formatter: '{b}: {d}%', color: '#0f172a' },
+                            data: pieData
+                        }
+                    ]
+                });
+
+                capacityPieInstanceRef.current.resize();
+
+                return () => {
+                    if (capacityPieInstanceRef.current) {
+                        capacityPieInstanceRef.current.dispose();
+                        capacityPieInstanceRef.current = null;
+                    }
+                };
+            }, [data, openStates]);
 
             const toggleAccordion = (key) => {
                 setOpenStates((prev) => ({ ...prev, [key]: !prev?.[key] }));
@@ -380,21 +459,55 @@
                                 {openStates[accordion.key] && (
                                     <div className="px-4 py-4 space-y-3">
                                         {accordion.type === 'list' && (
-                                            <div className="space-y-2">
-                                                {(accordion.items || []).map((item, idx) => (
-                                                    <div key={idx} className="flex items-start gap-2 text-sm text-slate-700">
-                                                        <span className="text-slate-300">•</span>
-                                                        {isEdit ? (
-                                                            <textarea
-                                                                value={item || ''}
-                                                                onChange={(e) => updateListItem(accordion.key, idx, e.target.value)}
-                                                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            />
-                                                        ) : (
-                                                            <span className="leading-relaxed">{item}</span>
-                                                        )}
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    {(accordion.items || []).map((item, idx) => (
+                                                        <div key={idx} className="flex items-start gap-2 text-sm text-slate-700">
+                                                            <span className="text-slate-300">•</span>
+                                                            {isEdit ? (
+                                                                <textarea
+                                                                    value={item || ''}
+                                                                    onChange={(e) => updateListItem(accordion.key, idx, e.target.value)}
+                                                                    className="w-full border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                />
+                                                            ) : (
+                                                                <span className="leading-relaxed">{item}</span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {accordion.capacityData && (
+                                                    <div className="space-y-3">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div className="text-sm font-semibold text-slate-800">{accordion.capacityData.title}</div>
+                                                            {accordion.capacityData.note && (
+                                                                <div className="text-xs text-slate-500">{accordion.capacityData.note}</div>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                                                <div className="grid grid-cols-3 bg-slate-50 text-xs font-semibold text-slate-600">
+                                                                    {(accordion.capacityData.headers || []).map((header, idx) => (
+                                                                        <div key={idx} className="px-3 py-2 border-r border-slate-200 last:border-r-0">
+                                                                            {header}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="divide-y divide-slate-200 text-sm">
+                                                                    {(accordion.capacityData.rows || []).map((row, idx) => (
+                                                                        <div key={idx} className="grid grid-cols-3">
+                                                                            <div className="px-3 py-2 border-r border-slate-100 text-slate-800 font-medium">{row.type}</div>
+                                                                            <div className="px-3 py-2 border-r border-slate-100 text-slate-700">{row.capacity}</div>
+                                                                            <div className="px-3 py-2 text-slate-700">{row.share}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="h-64" ref={capacityPieRef}></div>
+                                                        </div>
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         )}
 
@@ -700,10 +813,13 @@
                         details: [{ label: '数据来源', value: '实地调研 (1-3月收益表)' }]
                     },
                     '甘肃省': {
-                        title: '甘肃省', totalVolume: '2500万元',
-                        marketVolumeDisplay: '每月全市场调频总金额 2500-2600万元',
+                        title: '甘肃省', totalVolume: '2500-2600万元',
+                        marketVolumeDisplay: '25年7-9月调频总额连续上行至约2500-2600万元，同比去年同期抬升',
                         tags: ['趋势上涨', '半公开披露'],
-                        details: [{ label: '数据来源', value: '甘肃电力交易中心半公开披露信息' }]
+                        details: [
+                            { label: '数据来源', value: '甘肃电力交易中心半公开披露信息' },
+                            { label: '最新进展', value: '8、9月已上涨至约2600万元' }
+                        ]
                     },
                     '宁夏回族自治区': {
                         title: '宁夏回族自治区', totalVolume: '500万元',

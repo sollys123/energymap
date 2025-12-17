@@ -3,6 +3,7 @@ export const gansuProvinceFromPdf = {
   name: '甘肃',
   title: '甘肃',
   kpis: [
+    { label: '调频总额', value: '2500-2600 万元/月（连涨中）' },
     { label: '现货价差(均值)', value: '0.253 元/kWh' },
     { label: '调频上限', value: '15 元/MW' },
     { label: '容量电价', value: '330 元/kW·年（执行2年）' }
@@ -20,10 +21,38 @@ export const gansuProvinceFromPdf = {
         '装机概况：截至 2025 年 9 月，全口径装机容量 11612.75 万 kW；风光装机占比约 61%',
         '新能源分布：河西走廊地区（张掖、武威、金昌）优势明显；日照时间长、强度高、戈壁大漠适合大型基地；风力强劲且稳定',
         '负荷与调峰：2024 年全社会用电量 1746.33 亿 kWh；最大用电负荷 2395 万 kW；峰谷差 400–500 万 kW；最大调峰缺口超 1000 万 kW'
-      ]
+      ],
+      capacityData: {
+        title: '装机容量结构（万千瓦）',
+        headers: ['电源类型', '装机容量', '占比'],
+        rows: [
+          { type: '火电', capacity: '3150.21', share: '27.13%' },
+          { type: '水电', capacity: '971.61', share: '8.37%' },
+          { type: '风电', capacity: '3780.80', share: '32.56%' },
+          { type: '太阳能', capacity: '3710.13', share: '31.95%' },
+          { type: '储能', capacity: '659.48', share: '-' }
+        ],
+        pie: [
+          { name: '火电', value: 3150.21 },
+          { name: '水电', value: 971.61 },
+          { name: '风电', value: 3780.8 },
+          { name: '太阳能', value: 3710.13 },
+          { name: '储能', value: 659.48 }
+        ],
+        note: '数据来源：甘肃电力交易中心披露的装机容量结构'
+      }
     },
     {
       key: 'B',
+      title: '现货市场进程',
+      type: 'list',
+      items: [
+        '2021年5月：开展连续不间断结算试运行，形成现货交易规则雏形',
+        '2024年9月5日：转入正式运行，标志着现货市场常态化落地'
+      ]
+    },
+    {
+      key: 'C',
       title: '现货电价（1-7月统计）',
       type: 'keyValue',
       items: [
@@ -35,7 +64,7 @@ export const gansuProvinceFromPdf = {
       ]
     },
     {
-      key: 'C',
+      key: 'D',
       title: '调频（辅助服务）',
       type: 'sections',
       sections: [
@@ -59,7 +88,7 @@ export const gansuProvinceFromPdf = {
       ]
     },
     {
-      key: 'D',
+      key: 'E',
       title: '容量电价',
       type: 'keyValue',
       items: [
@@ -73,7 +102,7 @@ export const gansuProvinceFromPdf = {
       ]
     },
     {
-      key: 'E',
+      key: 'F',
       title: '收益 & 财务（100MW/400MWh）',
       type: 'finance',
       table: {
