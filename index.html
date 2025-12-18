@@ -753,6 +753,40 @@
                 'L': { color: '#0057F1', symbol: 'diamond', label: '负荷中心', beltColor: '#A8ECFF' }
             };
 
+            const gansuGridIllustration = `data:image/svg+xml;utf8,${encodeURIComponent(`
+                <svg width="960" height="460" viewBox="0 0 960 460" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
+                        </marker>
+                    </defs>
+                    <rect x="0" y="0" width="960" height="460" rx="18" fill="#f8fafc" />
+                    <circle cx="220" cy="200" r="80" fill="#dcfce7" stroke="#16a34a" stroke-width="2" />
+                    <text x="220" y="185" text-anchor="middle" font-size="16" fill="#15803d" font-weight="700">新能源消纳</text>
+                    <text x="220" y="210" text-anchor="middle" font-size="14" fill="#15803d" font-weight="600">基地集群</text>
+                    <circle cx="660" cy="250" r="88" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+                    <text x="660" y="235" text-anchor="middle" font-size="16" fill="#075985" font-weight="700">负荷中心</text>
+                    <text x="660" y="260" text-anchor="middle" font-size="14" fill="#075985" font-weight="600">兰州—天水—庆阳</text>
+
+                    <line x1="220" y1="200" x2="660" y2="250" stroke="#334155" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#arrow)" />
+                    <line x1="220" y1="200" x2="540" y2="120" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)" />
+                    <line x1="220" y1="200" x2="460" y2="330" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)" />
+                    <line x1="540" y1="120" x2="760" y2="120" stroke="#7e22ce" stroke-width="3" marker-end="url(#arrow)" />
+                    <line x1="540" y1="120" x2="520" y2="40" stroke="#7e22ce" stroke-width="3" marker-end="url(#arrow)" />
+                    <line x1="460" y1="330" x2="780" y2="330" stroke="#0ea5e9" stroke-width="3" marker-end="url(#arrow)" />
+                    <line x1="460" y1="330" x2="420" y2="410" stroke="#0ea5e9" stroke-width="3" marker-end="url(#arrow)" />
+
+                    <text x="540" y="105" font-size="12" fill="#6b7280">宁夏电网</text>
+                    <text x="525" y="55" font-size="12" fill="#6b7280">新甘电网</text>
+                    <text x="780" y="115" font-size="12" fill="#6b7280">陕西电网</text>
+                    <text x="780" y="345" font-size="12" fill="#6b7280">青海电网</text>
+                    <text x="410" y="430" font-size="12" fill="#6b7280">陇东—陕北联络</text>
+                    <text x="200" y="340" font-size="12" fill="#6b7280">酒泉—瓜州—玉门</text>
+                    <text x="160" y="360" font-size="12" fill="#6b7280">新能源走廊</text>
+                    <text x="630" y="295" font-size="12" fill="#6b7280">河东负荷中心</text>
+                </svg>
+            `)} `;
+
             // --- 数据源 ---
 
             // A0. 资源禀赋数据（可扩展、可上传）
@@ -787,7 +821,7 @@
             // A. 二次调频数据 (Frequency Data) - 沿用之前的数据
             const frequencyData = {
                 mapValues: {
-                    '河北省': 5000, '河南省': 4000, '广东省': 5000, 
+                    '河北省': 5000, '河南省': 4000, '广东省': 5000,
                     '山西省': 4100, '甘肃省': 2500, '宁夏回族自治区': 500
                 },
                 details: {
@@ -863,6 +897,30 @@
                     '河北省': [{ name: '冀南钢铁煤电带', type: 'F', coords: [[114.50, 37.06], [114.47, 36.60]], label: '邢台-邯郸 煤电钢铁带' }],
                     '广东省': [{ name: '珠江口核电走廊', type: 'S', coords: [[112.93, 21.92], [114.54, 22.60], [114.8, 22.7]], label: '珠江口核电走廊' }]
                 }
+            };
+
+            const gansuUnifiedOverlay = {
+                points: [
+                    { name: '河西新能源基地群', coord: [97.3, 39.8], type: 'N', label: '酒泉-瓜州-玉门 风光基地', desc: '河西走廊风光大基地集群' },
+                    { name: '张掖枢纽', coord: [100.45, 38.93], type: 'N', label: '张掖枢纽', desc: '新能源集结/送出节点' },
+                    { name: '金昌枢纽', coord: [102.2, 38.52], type: 'N', label: '金昌-武威通道', desc: '河西并网汇集' },
+                    { name: '兰州负荷中心', coord: [103.84, 36.06], type: 'L', label: '河东负荷中心', desc: '兰州-白银-定西负荷中心' },
+                    { name: '陇东联络', coord: [107.0, 35.6], type: 'L', label: '陇东—陕北联络', desc: '庆阳/平凉方向负荷' }
+                ],
+                belts: [
+                    { name: '河西新能源走廊', type: 'N', coords: [[95.5, 40.6], [101.4, 40.3], [101.2, 39.2], [95.3, 39.3]], label: '河西新能源走廊' },
+                    { name: '河东负荷区', type: 'L', coords: [[102.6, 36.9], [106.5, 36.6], [106.2, 35.1], [102.2, 35.4]], label: '河东负荷中心' }
+                ],
+                connections: [
+                    { coords: [[97.3, 39.8], [103.84, 36.06]], type: 'N', label: '河西—河东主干网', desc: '新能源外送主力通道', width: 3 },
+                    { coords: [[97.3, 39.8], [100.45, 38.93]], type: 'N', label: '酒泉—张掖', desc: '风光基地并网', width: 2 },
+                    { coords: [[100.45, 38.93], [102.2, 38.52]], type: 'N', label: '张掖—金昌', desc: '河西主支架', width: 2 },
+                    { coords: [[102.2, 38.52], [103.84, 36.06]], type: 'N', label: '金昌—兰州', desc: '接入河东负荷', width: 2 },
+                    { coords: [[103.84, 36.06], [107.0, 35.6]], type: 'L', label: '兰州—陇东', desc: '东部负荷/外送', width: 2 },
+                    { coords: [[103.84, 36.06], [101.0, 35.9]], type: 'S', label: '兰州—青海联络', desc: '联络青海电网', width: 2, curveness: 0.15 },
+                    { coords: [[103.84, 36.06], [105.7, 37.5]], type: 'S', label: '兰州—宁夏联络', desc: '联络宁夏电网', width: 2, curveness: 0.12 },
+                    { coords: [[107.0, 35.6], [108.8, 34.9]], type: 'S', label: '陇东—关中', desc: '向陕甘两向送出', width: 2, curveness: 0.12 }
+                ]
             };
 
             // B. 电能量数据 (Energy Data)
@@ -1359,6 +1417,24 @@
                     };
                 });
             };
+
+            const convertConnectionData = (data) => {
+                if (!data) return [];
+                return data.map(item => {
+                    const cfg = pointTypeConfig[item.type];
+                    return {
+                        coords: item.coords,
+                        lineStyle: {
+                            color: cfg?.color || '#0f172a',
+                            width: item.width || 2,
+                            opacity: item.opacity || 0.9,
+                            type: item.dashed ? 'dashed' : 'solid',
+                            curveness: item.curveness || 0
+                        },
+                        tooltipData: { label: item.label, desc: item.desc, type: item.type }
+                    };
+                });
+            };
             
             // 生成热力图数据 (根据当前市场类型)
             const generateMapData = () => {
@@ -1601,6 +1677,11 @@
                         // === 省份视图 ===
                         const pPoints = (currentData.provincePoints || {})[provinceName] || [];
                         const pBelts = (currentData.provinceBelts || {})[provinceName] || [];
+                        const provinceShortName = (provinceName || '').replace(/省|市|自治区|回族|壮族|维吾尔/g, '');
+                        const isGansuProvince = provinceShortName === '甘肃';
+                        const mergedPoints = isGansuProvince ? [...pPoints, ...(gansuUnifiedOverlay.points || [])] : pPoints;
+                        const mergedBelts = isGansuProvince ? [...pBelts, ...(gansuUnifiedOverlay.belts || [])] : pBelts;
+                        const mergedConnections = isGansuProvince ? (gansuUnifiedOverlay.connections || []) : [];
 
                         option = {
                             backgroundColor: 'transparent',
@@ -1609,12 +1690,12 @@
                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                 borderColor: '#e2e8f0', borderWidth: 1, padding: 12, textStyle: { color: '#1e293b' },
                                 formatter: (params) => {
-                                    if (params.seriesType === 'effectScatter' || (params.seriesType === 'lines' && params.seriesName === '能源走廊')) {
+                                    if (params.data?.tooltipData) {
                                         const d = params.data.tooltipData;
                                         const typeInfo = pointTypeConfig[d.type] || { label: '未知' };
-                                        return `<div style="font-weight:bold; margin-bottom:2px; color:${params.color}">${d.label}</div>
-                                                <div style="font-size:12px;color:#64748b; margin-bottom:4px;">${d.desc || ''}</div>
-                                                <div style="font-size:10px;color:#94a3b8;">类型: ${typeInfo.label}</div>`;
+                                        return `<div style="font-weight:bold; margin-bottom:2px; color:${params.color}">${d.label}</div>`
+                                                + `<div style=\"font-size:12px;color:#64748b; margin-bottom:4px;\">${d.desc || ''}</div>`
+                                                + `<div style=\"font-size:10px;color:#94a3b8;\">类型: ${typeInfo.label}</div>`;
                                     }
                                     return params.name;
                                 }
@@ -1628,19 +1709,26 @@
                             series: [
                                 {
                                     name: '能源走廊边框', type: 'lines', coordinateSystem: 'geo', polyline: true,
-                                    data: convertBeltBorderData(pBelts),
+                                    data: convertBeltBorderData(mergedBelts),
                                     lineStyle: { width: 26, color: 'rgba(255, 255, 255, 0.95)', cap: 'round', join: 'round', shadowBlur: 8, shadowColor: 'rgba(255, 255, 255, 0.8)' },
                                     silent: true, zlevel: 1.5
                                 },
                                 {
                                     name: '能源走廊', type: 'lines', coordinateSystem: 'geo', polyline: true,
-                                    data: convertBeltFillData(pBelts),
+                                    data: convertBeltFillData(mergedBelts),
                                     lineStyle: { width: 20, opacity: 0.65, cap: 'round', join: 'round' },
                                     silent: false, zlevel: 1.6
                                 },
                                 {
+                                    name: '网架联络', type: 'lines', coordinateSystem: 'geo',
+                                    data: convertConnectionData(mergedConnections),
+                                    lineStyle: { width: 2, color: '#0f172a', opacity: 0.9 },
+                                    effect: { show: true, symbol: 'arrow', symbolSize: 8, period: 8, trailLength: 0 },
+                                    zlevel: 1.8
+                                },
+                                {
                                     name: '能源基地', type: 'effectScatter', coordinateSystem: 'geo',
-                                    data: convertPointData(pPoints),
+                                    data: convertPointData(mergedPoints),
                                     symbolSize: 18, showEffectOn: 'render', rippleEffect: { brushType: 'fill', scale: 2 },
                                     hoverAnimation: true, label: { show: false }, zlevel: 2
                                 }
@@ -1720,6 +1808,24 @@
                     }
                 });
                 return normalized;
+            };
+
+            const gansuDefaultGridItem = {
+                id: 'gansu-grid-default',
+                src: gansuGridIllustration,
+                name: '甘肃网架/负荷示意图（内置）',
+                updatedAt: '内置示意'
+            };
+
+            const buildProvinceGridList = (provinceName) => {
+                if (!provinceName) return [];
+                const uploads = Array.isArray(gridUploads[provinceName]) ? gridUploads[provinceName] : [];
+                const normalized = provinceName.replace(/省|市|自治区|回族|壮族|维吾尔/g, '');
+                const list = [...uploads];
+                if (normalized === '甘肃') {
+                    list.unshift(gansuDefaultGridItem);
+                }
+                return list;
             };
 
             const handleGridUpload = (event) => {
@@ -1972,7 +2078,7 @@
                             : '现货市场进程概览';
 
             const detailProvinceName = selectedProvinceName || currentProvince;
-            const provinceGridList = detailProvinceName && Array.isArray(gridUploads[detailProvinceName]) ? gridUploads[detailProvinceName] : [];
+            const provinceGridList = buildProvinceGridList(detailProvinceName);
 
             const mainTitle = viewMode === 'province'
                 ? `${currentProvince}详情`
@@ -2433,7 +2539,7 @@
                         </div>
 
                         {/* 右侧详情面板 */}
-                        <div className={`absolute right-0 top-0 bottom-0 z-30 w-full md:w-[400px] bg-white shadow-2xl md:border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${selectedProvinceInfo ? 'translate-x-0' : 'translate-x-full'}`}>
+                        <div className={`absolute right-0 top-0 bottom-0 z-30 w-full md:w-[480px] bg-white shadow-2xl md:border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${selectedProvinceInfo ? 'translate-x-0' : 'translate-x-full'}`}>
                             {selectedProvinceInfo && (
                                 shouldShowGansuSidebar ? (
                                     <GansuProvinceSidebarText mode={appMode} onClose={handleSidebarClose} />
