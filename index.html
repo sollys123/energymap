@@ -182,7 +182,7 @@
             footerNote: '数据来源：《甘肃省独立储能政策分析.pdf》'
         };
 
-        const GansuProvinceSidebarText = ({ mode = 'VIEW', onClose }) => {
+        const GansuProvinceSidebarText = ({ mode = 'VIEW', onClose, gridList = [], onUploadGrid }) => {
             const isEdit = mode === 'EDIT';
             const baseData = useMemo(() => JSON.parse(JSON.stringify(GANSU_PROVINCE_DEFAULT)), []);
             const buildAccordionState = (accordions = []) => {
@@ -195,6 +195,19 @@
             const [openStates, setOpenStates] = useState(() => buildAccordionState(baseData?.accordions));
             const capacityPieRef = useRef(null);
             const capacityPieInstanceRef = useRef(null);
+            const latestGridItem = useMemo(() => {
+                const validList = Array.isArray(gridList) ? gridList.filter(Boolean) : [];
+                const userUploads = validList.filter((item) => item?.id !== 'gansu-grid-default');
+                if (userUploads.length) return userUploads[userUploads.length - 1];
+                return validList[validList.length - 1] || null;
+            }, [gridList]);
+
+            const handleGansuGridUpload = (event) => {
+                const files = Array.from(event.target.files || []);
+                if (!files.length || !onUploadGrid) return;
+                onUploadGrid(files);
+                event.target.value = '';
+            };
 
             useEffect(() => {
                 setData(baseData);
@@ -416,7 +429,7 @@
                             </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="mt-4 flex flex-col gap-2">
                             {(data.kpis || []).map((item, idx) => (
                                 <div
                                     key={idx}
@@ -443,6 +456,39 @@
                                     )}
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-3 border border-blue-100 rounded-lg p-3 bg-blue-50/40 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-blue-700 uppercase tracking-wider">
+                                    <Layers size={14} />
+                                    网架/规划示意图
+                                </div>
+                                {isEdit && (
+                                    <label className="text-[11px] font-semibold text-blue-700 border border-blue-200 bg-white px-2 py-1 rounded cursor-pointer hover:bg-blue-50">
+                                        上传
+                                        <input type="file" accept="image/*" multiple onChange={handleGansuGridUpload} className="hidden" />
+                                    </label>
+                                )}
+                            </div>
+                            {latestGridItem ? (
+                                <div className="rounded-lg overflow-hidden border border-blue-100 bg-white shadow-sm">
+                                    <img src={latestGridItem.src} alt={latestGridItem.name || '甘肃网架示意图'} className="w-full h-28 object-cover" />
+                                    <div className="text-[11px] text-slate-500 px-3 py-1.5 flex items-center justify-between">
+                                        <span className="truncate" title={latestGridItem.name || '甘肃网架示意图'}>{latestGridItem.name || '甘肃网架示意图'}</span>
+                                        {latestGridItem.updatedAt && (
+                                            <span className="text-[10px] text-slate-400">
+                                                更新: {latestGridItem.updatedAt === '内置示意' ? latestGridItem.updatedAt : new Date(latestGridItem.updatedAt).toLocaleDateString('zh-CN')}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-[12px] text-slate-600 border border-dashed border-blue-200 rounded-md px-3 py-2 bg-white/70">
+                                    尚未上传网架图，支持在此直接为甘肃侧栏添加。
+                                </div>
+                            )}
+                            <div className="text-[11px] text-slate-500">上传内容仅关联甘肃省，会在侧栏与地图详情里同步展示。</div>
                         </div>
                     </div>
 
@@ -1388,6 +1434,19 @@
             }, [marketType, energyView, resourceData, overviewData]);
 
             // --- 数据转换函数 ---
+            const withAlpha = (hexColor, alpha) => {
+                if (!hexColor || typeof hexColor !== 'string') return `rgba(14,165,233,${alpha})`;
+                if (!hexColor.startsWith('#')) return hexColor;
+                const hex = hexColor.replace('#', '');
+                const normalized = hex.length === 3
+                    ? hex.split('').map(ch => ch + ch).join('')
+                    : hex.padEnd(6, '0');
+                const r = parseInt(normalized.slice(0, 2), 16) || 14;
+                const g = parseInt(normalized.slice(2, 4), 16) || 165;
+                const b = parseInt(normalized.slice(4, 6), 16) || 233;
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            };
+
             const convertPointData = (data) => {
                 if(!data) return [];
                 return data.map(item => {
@@ -1396,23 +1455,25 @@
                         name: item.name,
                         value: item.coord.concat(100),
                         symbol: cfg?.symbol || 'circle',
-                        itemStyle: { 
-                            color: cfg?.color || '#666', 
-                            borderColor: '#fff', borderWidth: 2, shadowBlur: 5, shadowColor: 'rgba(0,0,0,0.5)' 
+                        itemStyle: {
+                            color: cfg?.color || '#666',
+                            borderColor: '#fff', borderWidth: 2, shadowBlur: 5, shadowColor: 'rgba(0,0,0,0.5)'
                         },
                         tooltipData: item
                     };
                 });
             };
-            const convertBeltBorderData = (data) => data ? data.map(item => ({ coords: item.coords, name: item.label })) : [];
-            const convertBeltFillData = (data) => {
+
+            const convertBeltPolygonData = (data) => {
                 if(!data) return [];
                 return data.map(item => {
                     const cfg = pointTypeConfig[item.type];
+                    const baseColor = cfg?.beltColor || '#38bdf8';
                     return {
                         coords: item.coords,
-                        lineStyle: { color: cfg?.beltColor || '#ccc' },
                         name: item.label,
+                        fillColor: withAlpha(baseColor, 0.18),
+                        strokeColor: withAlpha(baseColor, 0.6),
                         tooltipData: { label: item.label, desc: '区域/走廊/产业带', type: item.type }
                     };
                 });
@@ -1708,16 +1769,35 @@
                             },
                             series: [
                                 {
-                                    name: '能源走廊边框', type: 'lines', coordinateSystem: 'geo', polyline: true,
-                                    data: convertBeltBorderData(mergedBelts),
-                                    lineStyle: { width: 26, color: 'rgba(255, 255, 255, 0.95)', cap: 'round', join: 'round', shadowBlur: 8, shadowColor: 'rgba(255, 255, 255, 0.8)' },
-                                    silent: true, zlevel: 1.5
-                                },
-                                {
-                                    name: '能源走廊', type: 'lines', coordinateSystem: 'geo', polyline: true,
-                                    data: convertBeltFillData(mergedBelts),
-                                    lineStyle: { width: 20, opacity: 0.65, cap: 'round', join: 'round' },
-                                    silent: false, zlevel: 1.6
+                                    name: '能源走廊区域', type: 'custom', coordinateSystem: 'geo',
+                                    data: convertBeltPolygonData(mergedBelts),
+                                    renderItem: (params, api) => {
+                                        const belt = params.data;
+                                        if (!belt?.coords?.length) return null;
+                                        const points = belt.coords.map(coord => api.coord(coord));
+                                        return {
+                                            type: 'polygon',
+                                            name: belt.name,
+                                            shape: { points },
+                                            style: {
+                                                fill: belt.fillColor || 'rgba(14,165,233,0.16)',
+                                                stroke: belt.strokeColor || '#38bdf8',
+                                                lineWidth: 1.2,
+                                                opacity: 0.9,
+                                                shadowBlur: 14,
+                                                shadowColor: belt.fillColor || 'rgba(56, 189, 248, 0.25)'
+                                            },
+                                            emphasis: {
+                                                style: {
+                                                    fill: belt.fillColor || 'rgba(14,165,233,0.28)',
+                                                    opacity: 1,
+                                                    shadowBlur: 18
+                                                }
+                                            }
+                                        };
+                                    },
+                                    silent: false,
+                                    zlevel: 1.5
                                 },
                                 {
                                     name: '网架联络', type: 'lines', coordinateSystem: 'geo',
@@ -1828,6 +1908,33 @@
                 return list;
             };
 
+            const handleProvinceGridUpload = (provinceName, files) => {
+                if (interactionMode !== 'edit') return;
+                if (!provinceName || !files?.length) return;
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const src = e.target.result;
+                        setGridUploads(prev => {
+                            const next = { ...prev };
+                            const list = Array.isArray(next[provinceName]) ? [...next[provinceName]] : [];
+                            list.push({
+                                id: `${file.name}-${Date.now()}`,
+                                src,
+                                name: file.name,
+                                updatedAt: new Date().toISOString()
+                            });
+                            next[provinceName] = list;
+                            return next;
+                        });
+                        if (provinceName === gridUploadProvince) {
+                            setGridPreview(src);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
             const handleGridUpload = (event) => {
                 if (interactionMode !== 'edit') return;
                 const files = Array.from(event.target.files || []);
@@ -1836,26 +1943,7 @@
                     alert('请先选择要归属的省份');
                     return;
                 }
-                files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const src = e.target.result;
-                        setGridUploads(prev => {
-                            const next = { ...prev };
-                            const list = Array.isArray(next[gridUploadProvince]) ? [...next[gridUploadProvince]] : [];
-                            list.push({
-                                id: `${file.name}-${Date.now()}`,
-                                src,
-                                name: file.name,
-                                updatedAt: new Date().toISOString()
-                            });
-                            next[gridUploadProvince] = list;
-                            return next;
-                        });
-                        setGridPreview(src);
-                    };
-                    reader.readAsDataURL(file);
-                });
+                handleProvinceGridUpload(gridUploadProvince, files);
                 event.target.value = '';
             };
 
@@ -2542,7 +2630,12 @@
                         <div className={`absolute right-0 top-0 bottom-0 z-30 w-full md:w-[480px] bg-white shadow-2xl md:border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${selectedProvinceInfo ? 'translate-x-0' : 'translate-x-full'}`}>
                             {selectedProvinceInfo && (
                                 shouldShowGansuSidebar ? (
-                                    <GansuProvinceSidebarText mode={appMode} onClose={handleSidebarClose} />
+                                    <GansuProvinceSidebarText
+                                        mode={appMode}
+                                        onClose={handleSidebarClose}
+                                        gridList={buildProvinceGridList('甘肃省')}
+                                        onUploadGrid={(files) => handleProvinceGridUpload('甘肃省', files)}
+                                    />
                                 ) : (
                                     <>
                                         <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-br from-slate-50 to-white">
